@@ -37,16 +37,37 @@ export default function CallPage({ params }: CallPageProps) {
 
       hasJoinedRef.current = true;
 
-      // Probe camera before the SDK tries — avoids unhandled internal rejection
+      // Probe camera and microphone before the SDK tries — avoids unhandled internal rejection
+      let cameraEnabled = true;
+      let micEnabled = true;
       try {
-        const probe = await navigator.mediaDevices.getUserMedia({ video: true });
+        const probe = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         probe.getTracks().forEach((t) => t.stop());
       } catch {
-        await c.camera.disable();
+        // Try camera only
+        try {
+          const probeCam = await navigator.mediaDevices.getUserMedia({ video: true });
+          probeCam.getTracks().forEach((t) => t.stop());
+        } catch {
+          cameraEnabled = false;
+          await c.camera.disable();
+        }
+        // Try microphone only
+        try {
+          const probeMic = await navigator.mediaDevices.getUserMedia({ audio: true });
+          probeMic.getTracks().forEach((t) => t.stop());
+        } catch {
+          micEnabled = false;
+          await c.microphone.disable();
+        }
       }
 
       try {
         await c.join({ create: true });
+        // Enable microphone after joining if permission was granted
+        if (micEnabled) {
+          await c.microphone.enable();
+        }
       } catch (err) {
         if (c.state.callingState !== CallingState.JOINED) {
           setError(err instanceof Error ? err.message : "Failed to join call");

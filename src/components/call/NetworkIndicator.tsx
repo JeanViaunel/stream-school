@@ -73,24 +73,22 @@ export function NetworkIndicator({
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger>
-          <button
-            onClick={() => setShowDetails(!showDetails)}
-            className={cn(
-              "flex items-center gap-2 rounded-full border px-3 py-1.5 transition-all duration-200",
-              config.bgColor,
-              config.borderColor,
-              className
-            )}
-          >
-            <Icon className={cn("h-4 w-4", config.color)} />
-            <span className={cn("text-xs font-medium", config.color)}>
-              {config.label}
-            </span>
-            {quality === "poor" && (
-              <AlertCircle className="h-3 w-3 text-red-400 animate-pulse" />
-            )}
-          </button>
+        <TooltipTrigger
+          onClick={() => setShowDetails(!showDetails)}
+          className={cn(
+            "flex items-center gap-2 rounded-full border px-3 py-1.5 transition-all duration-200",
+            config.bgColor,
+            config.borderColor,
+            className
+          )}
+        >
+          <Icon className={cn("h-4 w-4", config.color)} />
+          <span className={cn("text-xs font-medium", config.color)}>
+            {config.label}
+          </span>
+          {quality === "poor" && (
+            <AlertCircle className="h-3 w-3 text-red-400 animate-pulse" />
+          )}
         </TooltipTrigger>
         <TooltipContent
           side="bottom"

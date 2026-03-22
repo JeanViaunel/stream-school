@@ -20,19 +20,26 @@ import { CallEnded } from "./CallEnded";
 import { CallLobby } from "./CallLobby";
 import { type CallLayout } from "./LayoutSwitcher";
 
-function CallTimer() {
-  const { useCallSession } = useCallStateHooks();
-  const session = useCallSession();
+function CallTimer({ callingState }: { callingState: CallingState }) {
   const [elapsed, setElapsed] = useState(0);
+  const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!session?.started_at) return;
-    const start = new Date(session.started_at).getTime();
-    const interval = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - start) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [session?.started_at]);
+    if (callingState === CallingState.JOINED) {
+      if (!startTimeRef.current) {
+        startTimeRef.current = Date.now();
+      }
+      const interval = setInterval(() => {
+        if (startTimeRef.current) {
+          setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setElapsed(0);
+      startTimeRef.current = null;
+    }
+  }, [callingState]);
 
   const hours = Math.floor(elapsed / 3600);
   const mins = Math.floor((elapsed % 3600) / 60);
@@ -137,14 +144,17 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
 
   // Render the appropriate video layout
   const renderVideoLayout = () => {
+    const layoutProps = {
+      className: "w-full h-full",
+    };
     switch (layout) {
       case "grid":
-        return <PaginatedGridLayout groupSize={16} />;
+        return <PaginatedGridLayout groupSize={16} {...layoutProps} />;
       case "sidebar":
-        return <SpeakerLayout participantsBarPosition="right" />;
+        return <SpeakerLayout participantsBarPosition="right" {...layoutProps} />;
       case "spotlight":
       default:
-        return <SpeakerLayout participantsBarPosition="bottom" />;
+        return <SpeakerLayout participantsBarPosition="bottom" {...layoutProps} />;
     }
   };
 
@@ -198,7 +208,7 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
           </div>
 
           {/* Center: Timer */}
-          <CallTimer />
+          <CallTimer callingState={callingState} />
 
           {/* Right: Stats */}
           <div className="flex items-center gap-3">
@@ -215,14 +225,16 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
       <NetworkBanner quality={networkQuality} />
 
       {/* Main video area */}
-      <StreamTheme className="relative w-full h-full">
+      <StreamTheme className="relative w-full h-full !bg-transparent">
         <div className="absolute inset-0 flex items-center justify-center p-4 pt-20 pb-24">
           <div className={cn(
-            "w-full h-full transition-all duration-400",
+            "w-full h-full max-w-7xl mx-auto transition-all duration-400",
             showParticipants && "mr-80",
             showChat && "ml-80"
           )}>
-            {renderVideoLayout()}
+            <div className="w-full h-full rounded-2xl overflow-hidden">
+              {renderVideoLayout()}
+            </div>
           </div>
         </div>
       </StreamTheme>

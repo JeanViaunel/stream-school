@@ -61,30 +61,28 @@ function ControlButton({
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger>
-          <button
-            onClick={onClick}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            className={cn(
-              "group relative flex h-14 w-14 items-center justify-center rounded-2xl",
-              "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
-              isDanger
-                ? "bg-red-500/90 hover:bg-red-400 text-white shadow-[0_0_20px_rgba(239,68,68,0.35)] hover:shadow-[0_0_28px_rgba(239,68,68,0.5)] hover:scale-110"
-                : isActive
-                  ? "bg-white/12 hover:bg-white/18 text-white border border-white/10 hover:border-white/20 hover:scale-110 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
-                  : "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 hover:scale-110"
-            )}
-          >
-            <DisplayIcon className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
-            
-            {/* Volume indicator on hover */}
-            {showVolume && isActive && isHovered && (
-              <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 rounded-lg px-2 py-1">
-                <VolumeIndicator level={volume} />
-              </div>
-            )}
-          </button>
+        <TooltipTrigger
+          onClick={onClick}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          className={cn(
+            "group relative flex h-14 w-14 items-center justify-center rounded-2xl",
+            "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+            isDanger
+              ? "bg-red-500/90 hover:bg-red-400 text-white shadow-[0_0_20px_rgba(239,68,68,0.35)] hover:shadow-[0_0_28px_rgba(239,68,68,0.5)] hover:scale-110"
+              : isActive
+                ? "bg-white/12 hover:bg-white/18 text-white border border-white/10 hover:border-white/20 hover:scale-110 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                : "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 hover:scale-110"
+          )}
+        >
+          <DisplayIcon className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+          
+          {/* Volume indicator on hover */}
+          {showVolume && isActive && isHovered && (
+            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 rounded-lg px-2 py-1">
+              <VolumeIndicator level={volume} />
+            </div>
+          )}
         </TooltipTrigger>
         <TooltipContent side="top">
           <p>{label}</p>

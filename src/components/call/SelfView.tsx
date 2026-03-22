@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useCallStateHooks, VideoPreview } from "@stream-io/video-react-sdk";
+import { useCallStateHooks, ParticipantView } from "@stream-io/video-react-sdk";
 import { Move, Pin, PinOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,15 @@ export function SelfView({ className }: SelfViewProps) {
   const localParticipant = useLocalParticipant();
   const [isPinned, setIsPinned] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [position, setPosition] = useState({ x: 20, y: 20 });
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  // Initialize position to bottom-right
+  useEffect(() => {
+    setPosition({
+      x: window.innerWidth - 240,
+      y: window.innerHeight - 180,
+    });
+  }, []);
   const dragRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
@@ -86,7 +94,12 @@ export function SelfView({ className }: SelfViewProps) {
       }}
       onMouseDown={handleMouseDown}
     >
-      <VideoPreview className="w-full h-full object-cover" />
+      {localParticipant && (
+        <ParticipantView
+          participant={localParticipant}
+          className="w-full h-full"
+        />
+      )}
 
       {/* Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
