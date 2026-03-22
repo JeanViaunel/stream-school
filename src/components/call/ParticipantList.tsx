@@ -14,7 +14,7 @@ import {
   MoreVertical,
   Pin,
   Volume2,
-  VolumeX,
+  VolumeX
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,23 +22,38 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { VolumeIndicator } from "./VolumeVisualizer";
+
+// SFU TrackType enum values (AUDIO = 1, VIDEO = 2) — not re-exported by the React SDK
+const TRACK_AUDIO = 1;
+const TRACK_VIDEO = 2;
 
 interface ParticipantListProps {
   isOpen: boolean;
   onClose: () => void;
   isHost?: boolean;
+  call?: Call;
 }
 
-export function ParticipantList({ isOpen, onClose, isHost = false }: ParticipantListProps) {
+export function ParticipantList({
+  isOpen,
+  onClose,
+  isHost = false,
+  call,
+}: ParticipantListProps) {
   const { useParticipants, useLocalParticipant } = useCallStateHooks();
   // useParticipants() already includes the local participant
   const participants = useParticipants();
   const localParticipant = useLocalParticipant();
-  const [speakingVolumes, setSpeakingVolumes] = useState<Record<string, number>>({});
-  const [pinnedParticipants, setPinnedParticipants] = useState<Set<string>>(new Set());
+  const [speakingVolumes, setSpeakingVolumes] = useState<
+    Record<string, number>
+  >({});
+  const [pinnedParticipants, setPinnedParticipants] = useState<Set<string>>(
+    new Set()
+  );
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Track speaking volumes
   useEffect(() => {
@@ -54,6 +69,18 @@ export function ParticipantList({ isOpen, onClose, isHost = false }: Participant
     return () => clearInterval(interval);
   }, [participants]);
 
+  // Auto-scroll to the first speaking participant
+  useEffect(() => {
+    const speakingId = Object.keys(speakingVolumes)[0];
+    if (!speakingId || !listRef.current) return;
+    const el = listRef.current.querySelector<HTMLElement>(
+      `[data-session="${speakingId}"]`
+    );
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [speakingVolumes]);
+
+  const hostUserId = call?.state.createdBy?.id;
+
   const handlePin = (sessionId: string) => {
     setPinnedParticipants((prev) => {
       const next = new Set(prev);
@@ -65,8 +92,6 @@ export function ParticipantList({ isOpen, onClose, isHost = false }: Participant
       return next;
     });
   };
-
-  const allParticipants = participants;
 
   return (
     <>
@@ -91,29 +116,38 @@ export function ParticipantList({ isOpen, onClose, isHost = false }: Participant
             <Users className="h-5 w-5 text-white/60" />
             <h3 className="font-semibold text-white">Participants</h3>
             <span className="text-xs text-white/40 bg-white/10 px-2 py-0.5 rounded-full">
-              {allParticipants.length}
+              {participants.length}
             </span>
           </div>
-          <button
+          <Button
+            size="icon"
+            variant="ghost"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+            className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         {/* List */}
-        <div className="overflow-y-auto h-[calc(100%-65px)] scrollbar-thin p-2 space-y-1">
-          {allParticipants.map((participant, index) => {
-            const isLocal = participant.sessionId === localParticipant?.sessionId;
+        <div ref={listRef} className="overflow-y-auto h-[calc(100%-65px)] scrollbar-thin p-2 space-y-1">
+          {participants.map((participant, index) => {
+            const isLocal =
+              participant.sessionId === localParticipant?.sessionId;
             const isSpeaking = participant.isSpeaking;
             const isPinned = pinnedParticipants.has(participant.sessionId);
-            const isScreenSharing = participant.screenShareStream;
+            const isScreenSharing = !!participant.screenShareStream;
             const volume = speakingVolumes[participant.sessionId] || 0;
+            const hasMic = (participant.publishedTracks as number[]).includes(TRACK_AUDIO);
+            const hasCamera = (participant.publishedTracks as number[]).includes(TRACK_VIDEO);
+            const isCallHost =
+              (isLocal && isHost) ||
+              (!!hostUserId && participant.userId === hostUserId);
 
             return (
               <div
                 key={participant.sessionId}
+                data-session={participant.sessionId}
                 className={cn(
                   "group flex items-center gap-3 p-3 rounded-xl transition-all duration-200",
                   isSpeaking
@@ -124,9 +158,11 @@ export function ParticipantList({ isOpen, onClose, isHost = false }: Participant
               >
                 {/* Avatar */}
                 <div className="relative">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border border-white/10 flex items-center justify-center">
+                  <div className="h-10 w-10 rounded-full bg-linear-to-br from-purple-500/20 to-indigo-500/20 border border-white/10 flex items-center justify-center">
                     <span className="text-sm font-semibold text-white/80">
-                      {(participant.name || participant.userId || "U").slice(0, 2).toUpperCase()}
+                      {(participant.name || participant.userId || "U")
+                        .slice(0, 2)
+                        .toUpperCase()}
                     </span>
                   </div>
                   {isSpeaking && (
@@ -141,20 +177,48 @@ export function ParticipantList({ isOpen, onClose, isHost = false }: Participant
                       {participant.name || participant.userId || "Unknown"}
                     </span>
                     {isLocal && (
-                      <span className="text-[10px] text-white/40 bg-white/10 px-1.5 rounded">You</span>
+                      <span className="text-[10px] text-white/40 bg-white/10 px-1.5 rounded">
+                        You
+                      </span>
+                    )}
+                    {isCallHost && (
+                      <Crown className="h-3 w-3 text-amber-400 shrink-0" aria-label="Host" />
                     )}
                     {isScreenSharing && (
-                      <Monitor className="h-3 w-3 text-purple-400" />
+                      <Monitor className="h-3 w-3 text-purple-400 shrink-0" />
                     )}
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {isSpeaking ? (
+                      <Volume2 className="h-3 w-3 text-emerald-400 shrink-0" />
+                    ) : (
+                      <VolumeX className="h-3 w-3 text-white/30 shrink-0" />
+                    )}
                     {isSpeaking && (
                       <VolumeIndicator level={volume} className="h-2" />
                     )}
                     <span className="text-xs text-white/40">
-                      {isSpeaking ? "Speaking" : isScreenSharing ? "Sharing screen" : "Muted"}
+                      {isSpeaking
+                        ? "Speaking"
+                        : isScreenSharing
+                          ? "Sharing screen"
+                          : "Muted"}
                     </span>
                   </div>
+                </div>
+
+                {/* Mic / camera status */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {hasMic ? (
+                    <Mic className="h-3.5 w-3.5 text-white/40" />
+                  ) : (
+                    <MicOff className="h-3.5 w-3.5 text-red-400" />
+                  )}
+                  {hasCamera ? (
+                    <Video className="h-3.5 w-3.5 text-white/40" />
+                  ) : (
+                    <VideoOff className="h-3.5 w-3.5 text-red-400" />
+                  )}
                 </div>
 
                 {/* Actions */}
@@ -177,7 +241,10 @@ export function ParticipantList({ isOpen, onClose, isHost = false }: Participant
                       <DropdownMenuTrigger className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10">
                         <MoreVertical className="h-3.5 w-3.5" />
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="glass-strong border-white/10">
+                      <DropdownMenuContent
+                        align="end"
+                        className="glass-strong border-white/10"
+                      >
                         <DropdownMenuItem className="text-white/80 hover:text-white hover:bg-white/10">
                           <MicOff className="h-4 w-4 mr-2" />
                           Mute for all

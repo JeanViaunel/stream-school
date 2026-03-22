@@ -47,13 +47,9 @@ export function CallMessageCard({
         if (cancelled) return;
 
         if (call.state.endedAt) {
-          setStatus("ended");
-
-          // Check participant history stored in call custom data
-          const joinedParticipants =
-            (
-              call.state.custom as Record<string, unknown>
-            )?.joinedParticipants as string[] | undefined;
+          const joinedParticipants = (
+            call.state.custom as Record<string, unknown>
+          )?.joinedParticipants as string[] | undefined;
 
           const currentUserId = chatClient.userID ?? "";
           const wasIn =
@@ -61,7 +57,6 @@ export function CallMessageCard({
             (joinedParticipants?.includes(currentUserId) ?? false);
           setWasParticipant(wasIn);
 
-          // Calculate duration
           const endedAt = call.state.endedAt;
           const startedAt = call.state.startedAt;
           if (endedAt && startedAt) {
@@ -69,6 +64,8 @@ export function CallMessageCard({
               new Date(endedAt).getTime() - new Date(startedAt).getTime();
             setDuration(Math.floor(ms / 1000));
           }
+
+          setStatus("ended");
         } else {
           setStatus("active");
         }
@@ -80,9 +77,15 @@ export function CallMessageCard({
       }
     };
 
+    // Initial check
     checkStatus();
+
+    // Poll every 5 s so the Join button disables as soon as the call ends
+    const interval = setInterval(checkStatus, 5000);
+
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, [callId, videoClient, chatClient.userID, isOwnMessage]);
 

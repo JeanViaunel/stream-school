@@ -46,7 +46,9 @@ export function ChannelItem({ channel, index = 0 }: ChannelItemProps) {
   
   const isActive = params.channelId === channel.id;
   const members = Object.values(channel.state.members);
-  const isGroup = members.length > 2;
+  const channelData = channel.data as Record<string, unknown> | undefined;
+  // Groups always have an explicit name; DMs never do
+  const isGroup = !!(channelData?.name as string | undefined)?.trim();
   
   // Get other member for DMs
   const otherMember = !isGroup 
@@ -56,7 +58,6 @@ export function ChannelItem({ channel, index = 0 }: ChannelItemProps) {
   const isOnline = otherMember?.user?.online ?? false;
   
   // Get channel name
-  const channelData = channel.data as Record<string, unknown> | undefined;
   const channelName = (channelData?.name as string) || 
     (isGroup 
       ? `Group (${members.length})`

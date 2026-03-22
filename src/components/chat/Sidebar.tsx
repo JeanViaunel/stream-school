@@ -109,14 +109,15 @@ export function Sidebar() {
     });
   }, [channelList.channels, searchQuery]);
   
-  // Separate channels by type
+  // Separate channels by type — groups have an explicit name, DMs do not
   const { directMessages, groupChats } = useMemo(() => {
     const dms: Channel[] = [];
     const groups: Channel[] = [];
     
     filteredChannels.forEach(channel => {
-      const memberCount = Object.keys(channel.state.members).length;
-      if (memberCount > 2) {
+      const channelData = channel.data as Record<string, unknown> | undefined;
+      const hasName = !!(channelData?.name as string | undefined)?.trim();
+      if (hasName) {
         groups.push(channel);
       } else {
         dms.push(channel);
@@ -127,13 +128,19 @@ export function Sidebar() {
   }, [filteredChannels]);
   
   async function handleDMSelect(userId: string) {
-    const channel = client.channel("messaging", {
-      members: [session!.streamUserId, userId],
-    });
-    await channel.watch();
-    setShowDMModal(false);
-    setActiveChannel(channel);
-    router.push(`/messages/${channel.id}`);
+    try {
+      const channel = client.channel("messaging", {
+        members: [session!.streamUserId, userId],
+      });
+      await channel.watch();
+      setShowDMModal(false);
+      await fetchChannels();
+      setActiveChannel(channel);
+      router.push(`/messages/${channel.id}`);
+    } catch (error) {
+      console.error("Failed to create DM:", error);
+      toast.error("Failed to start conversation. Please try again.");
+    }
   }
   
   async function handleLogout() {

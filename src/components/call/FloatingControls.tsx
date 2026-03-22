@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useCall, useCallStateHooks } from "@stream-io/video-react-sdk";
 import {
   Mic,
@@ -16,6 +16,9 @@ import {
   MoreVertical,
   Volume2,
   VolumeX,
+  PhoneForwarded,
+  LogOut,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -117,13 +120,17 @@ export function FloatingControls({
   volume = 0,
 }: FloatingControlsProps) {
   const call = useCall();
-  const { useMicrophoneState, useCameraState, useScreenShareState } = useCallStateHooks();
+  const { useMicrophoneState, useCameraState, useScreenShareState, useLocalParticipant } = useCallStateHooks();
   const { isMute: isMicMuted, microphone } = useMicrophoneState();
   const { isMute: isCameraMuted, camera } = useCameraState();
   const { isMute: isScreenShareMuted, screenShare } = useScreenShareState();
+  const localParticipant = useLocalParticipant();
+  const isHost = !!call?.state.createdBy?.id &&
+    call.state.createdBy.id === localParticipant?.userId;
   const [isVisible, setIsVisible] = useState(true);
   const [lastMouseMove, setLastMouseMove] = useState(Date.now());
   const [micVolume, setMicVolume] = useState(0);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
 
   const isMicOn = !isMicMuted;
   const isCamOn = !isCameraMuted;
@@ -159,17 +166,21 @@ export function FloatingControls({
   }, [isMicOn]);
 
   async function handleLeave() {
-    try {
-      await camera.disable();
-    } catch {}
-    try {
-      await microphone.disable();
-    } catch {}
+    try { await camera.disable(); } catch {}
+    try { await microphone.disable(); } catch {}
     await call?.leave();
     onLeave();
   }
 
+  async function handleEndForAll() {
+    try { await camera.disable(); } catch {}
+    try { await microphone.disable(); } catch {}
+    await call?.endCall();
+    onLeave();
+  }
+
   return (
+    <>
     <div
       className={cn(
         "fixed bottom-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-300",
@@ -263,9 +274,9 @@ export function FloatingControls({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Leave button */}
+        {/* Leave button — opens confirmation modal */}
         <button
-          onClick={handleLeave}
+          onClick={() => setShowLeaveModal(true)}
           className="flex h-14 px-6 items-center justify-center gap-2 rounded-2xl bg-red-500/90 hover:bg-red-400 text-white transition-all duration-150 hover:scale-105 shadow-[0_0_20px_rgba(239,68,68,0.35)] hover:shadow-[0_0_28px_rgba(239,68,68,0.5)]"
         >
           <PhoneOff className="h-5 w-5" />
@@ -273,5 +284,80 @@ export function FloatingControls({
         </button>
       </div>
     </div>
+
+    {/* Leave confirmation modal */}
+    {showLeaveModal && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        onClick={() => setShowLeaveModal(false)}
+      >
+        <div
+          className="relative w-full max-w-sm mx-4 rounded-3xl border border-white/10 bg-slate-900/95 shadow-2xl p-6 animate-scale-in"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Close */}
+          <button
+            onClick={() => setShowLeaveModal(false)}
+            className="absolute top-4 right-4 p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
+          {/* Icon */}
+          <div className="flex justify-center mb-5">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/15 border border-red-500/20">
+              <PhoneOff className="h-7 w-7 text-red-400" />
+            </div>
+          </div>
+
+          <h3 className="text-lg font-semibold text-white text-center mb-1">
+            Leave this call?
+          </h3>
+          <p className="text-sm text-white/50 text-center mb-6">
+            Choose how you want to exit
+          </p>
+
+          <div className="space-y-3">
+            {/* Leave quietly */}
+            <button
+              onClick={() => { setShowLeaveModal(false); handleLeave(); }}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all duration-150 group"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 group-hover:bg-white/15 transition-colors">
+                <LogOut className="h-5 w-5 text-white/70" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Leave call</p>
+                <p className="text-xs text-white/40">Others can continue without you</p>
+              </div>
+            </button>
+
+            {/* End for everyone — only visible to the call creator */}
+            {isHost && (
+              <button
+                onClick={() => { setShowLeaveModal(false); handleEndForAll(); }}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-left transition-all duration-150 group"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/20 group-hover:bg-red-500/30 transition-colors">
+                  <PhoneOff className="h-5 w-5 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-red-400">End for everyone</p>
+                  <p className="text-xs text-red-400/60">This will disconnect all participants</p>
+                </div>
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={() => setShowLeaveModal(false)}
+            className="mt-4 w-full py-2.5 rounded-xl text-sm text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

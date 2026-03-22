@@ -109,16 +109,13 @@ export function NewGroupModal({ onClose }: NewGroupModalProps) {
         session!.streamUserId,
         ...selected.map((u) => u.id),
       ];
-      const channel = client.channel("messaging", {
+      // Use an explicit ID so this is a non-distinct channel (true group, not a DM)
+      const channelId = `group_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const channel = client.channel("messaging", channelId, {
+        name: groupName.trim(),
         members,
       });
       await channel.watch();
-      // Set channel name
-      await channel.updatePartial({
-        set: {
-          name: groupName,
-        } as Record<string, unknown>,
-      });
       toast.success("Group created successfully!");
       onClose(channel.id);
     } catch (error) {

@@ -9,7 +9,7 @@ import {
   Window,
   useChannelStateContext,
   useChatContext,
-  useMessageContext,
+  useMessageContext
 } from "stream-chat-react";
 import { CallButton } from "@/components/call/CallButton";
 import { CallMessageCard } from "@/components/call/CallMessage";
@@ -21,22 +21,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
+  TooltipTrigger
 } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import {
-  Search,
-  Info,
-  MoreVertical,
-  ChevronLeft,
-  Users,
-} from "lucide-react";
+import { Search, Info, MoreVertical, ChevronLeft, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 function getInitials(name: string): string {
@@ -61,21 +55,25 @@ function CustomChannelHeader() {
 
   // Get channel info with type assertions
   const channelData = channel.data as Record<string, unknown> | undefined;
-  const channelName = (channelData?.name as string) || "Unnamed Channel";
   const channelImage = channelData?.image as string | undefined;
   const memberCount = Object.keys(channel.state.members).length;
-  
-  // Check if DM
+
+  // Groups always have an explicit name; DMs never do
   const members = Object.values(channel.state.members);
-  const isDM = members.length === 2;
+  const isDM = !(channelData?.name as string | undefined)?.trim();
+  const channelName = (channelData?.name as string) || "Direct Message";
   const otherMember = isDM
     ? members.find((m) => m.user?.id !== client.userID)?.user
     : null;
   const isOnline = otherMember?.online ?? false;
-  
+
   // Use other member info for DMs
-  const displayName = isDM ? otherMember?.name || otherMember?.id || "Unknown" : channelName;
-  const displayImage = isDM ? (otherMember?.image as string | undefined) : channelImage;
+  const displayName = isDM
+    ? otherMember?.name || otherMember?.id || "Unknown"
+    : channelName;
+  const displayImage = isDM
+    ? (otherMember?.image as string | undefined)
+    : channelImage;
 
   return (
     <div className="relative flex items-center border-b border-border/60 bg-card/50 px-4 py-3 backdrop-blur-md">
@@ -112,7 +110,10 @@ function CustomChannelHeader() {
       {/* Channel info */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <h2 className="truncate text-base font-semibold" style={{ fontFamily: "var(--font-syne)" }}>
+          <h2
+            className="truncate text-base font-semibold"
+            style={{ fontFamily: "var(--font-syne)" }}
+          >
             {displayName}
           </h2>
         </div>
@@ -140,33 +141,59 @@ function CustomChannelHeader() {
         <CallButton />
 
         <Tooltip>
-          <TooltipTrigger render={<Button size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground hover:text-foreground">
-              <Search className="h-4 w-4" />
-            </Button>} />
+          <TooltipTrigger
+            render={
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 text-muted-foreground hover:text-foreground"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            }
+          />
           <TooltipContent side="bottom">Search messages</TooltipContent>
         </Tooltip>
 
         <Tooltip>
-          <TooltipTrigger render={<Button size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground hover:text-foreground">
-              <Info className="h-4 w-4" />
-            </Button>} />
+          <TooltipTrigger
+            render={
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 text-muted-foreground hover:text-foreground"
+              >
+                <Info className="h-4 w-4" />
+              </Button>
+            }
+          />
           <TooltipContent side="bottom">Channel info</TooltipContent>
         </Tooltip>
 
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground hover:text-foreground">
-              <MoreVertical className="h-4 w-4" />
-            </Button>} />
+          <DropdownMenuTrigger
+            render={
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 text-muted-foreground hover:text-foreground"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            }
+          />
           <DropdownMenuContent align="end">
             <DropdownMenuItem>Mute notifications</DropdownMenuItem>
             <DropdownMenuItem>Mark as unread</DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">Leave channel</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive">
+              Leave channel
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
       {/* Gradient underline */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-primary/30 to-transparent" />
     </div>
   );
 }
@@ -183,8 +210,7 @@ function CustomMessage() {
   if (callAttachment) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const callId = (callAttachment as any).call_id as string;
-    const senderName =
-      message.user?.name || message.user?.id || "Someone";
+    const senderName = message.user?.name || message.user?.id || "Someone";
     const isOwnMessage = message.user?.id === client.userID;
 
     return (
@@ -218,11 +244,14 @@ function CustomMessageList() {
 
   return (
     <div className="relative flex-1 overflow-hidden">
-      <div ref={scrollAreaRef} className="h-full overflow-y-auto scrollbar-thin">
+      <div
+        ref={scrollAreaRef}
+        className="h-full overflow-y-auto scrollbar-thin"
+      >
         <MessageList Message={CustomMessage} />
       </div>
       <ScrollToBottom scrollAreaRef={scrollAreaRef} />
-      
+
       {/* Thread panel */}
       {activeThreadId && (
         <ThreadPanel
