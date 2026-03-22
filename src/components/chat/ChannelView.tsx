@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Channel,
   MessageList,
+  MessageSimple,
   Thread,
   Window,
   useChannelStateContext,
   useChatContext,
+  useMessageContext,
 } from "stream-chat-react";
 import { CallButton } from "@/components/call/CallButton";
+import { CallMessageCard } from "@/components/call/CallMessage";
 import { ThreadPanel } from "./ThreadPanel";
 import { ScrollToBottom } from "./ScrollToBottom";
 import { CustomMessageInput } from "./CustomMessageInput";
@@ -28,7 +31,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
-  Video,
   Search,
   Info,
   MoreVertical,
@@ -135,10 +137,7 @@ function CustomChannelHeader() {
 
       {/* Actions */}
       <div className="ml-2 flex items-center gap-1">
-        <Tooltip>
-          <TooltipTrigger render={<CallButton channelId={channel.id ?? ""} />} />
-          <TooltipContent side="bottom">Start video call</TooltipContent>
-        </Tooltip>
+        <CallButton />
 
         <Tooltip>
           <TooltipTrigger render={<Button size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground hover:text-foreground">
@@ -172,6 +171,36 @@ function CustomChannelHeader() {
   );
 }
 
+function CustomMessage() {
+  const { message } = useMessageContext();
+  const { client } = useChatContext();
+
+  const callAttachment = message.attachments?.find(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (a: any) => a.type === "call"
+  );
+
+  if (callAttachment) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const callId = (callAttachment as any).call_id as string;
+    const senderName =
+      message.user?.name || message.user?.id || "Someone";
+    const isOwnMessage = message.user?.id === client.userID;
+
+    return (
+      <div className="px-4 py-1">
+        <CallMessageCard
+          callId={callId}
+          senderName={senderName}
+          isOwnMessage={isOwnMessage}
+        />
+      </div>
+    );
+  }
+
+  return <MessageSimple />;
+}
+
 // Custom message list with enhanced features
 function CustomMessageList() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -190,7 +219,7 @@ function CustomMessageList() {
   return (
     <div className="relative flex-1 overflow-hidden">
       <div ref={scrollAreaRef} className="h-full overflow-y-auto scrollbar-thin">
-        <MessageList />
+        <MessageList Message={CustomMessage} />
       </div>
       <ScrollToBottom scrollAreaRef={scrollAreaRef} />
       
