@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local IDE / agent tooling
+.agent/
+.agents/
+.claude/
+.continue/
+.factory/
+.kiro/
+.playwright-mcp/
+.qwen/
+.windsurf/
+skills-lock.json
