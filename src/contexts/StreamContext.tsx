@@ -37,7 +37,8 @@ function ConnectedProviders({ session, children }: ConnectedProvidersProps) {
     const client = new StreamVideoClient({
       apiKey: API_KEY,
       user: { id: session.streamUserId, name: session.displayName },
-      token: session.token,
+      // Use latestToken ref as the seed — avoids recreating client on every token refresh
+      token: latestToken.current,
       tokenProvider,
       options: { rejectCallWhenBusy: true },
     });
@@ -47,7 +48,9 @@ function ConnectedProviders({ session, children }: ConnectedProvidersProps) {
       client.disconnectUser();
       setVideoClient(undefined);
     };
-  }, [session.streamUserId, session.token, session.displayName, tokenProvider]);
+    // session.token intentionally excluded — token refreshes go through tokenProvider
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.streamUserId, session.displayName, tokenProvider]);
 
   if (!chatClient || !videoClient) {
     return (

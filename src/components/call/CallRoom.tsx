@@ -151,7 +151,7 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
     return (
       <CallEnded
         duration={callDuration}
-        participantCount={participants.length + 1}
+        participantCount={participants.length}
         onRejoin={handleRejoin}
         onClose={handleCloseCallEnded}
       />
@@ -203,7 +203,7 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/30 backdrop-blur-md px-3 py-2">
               <Users className="h-4 w-4 text-white/60" />
-              <span className="text-sm text-white/80">{participants.length + 1}</span>
+              <span className="text-sm text-white/80">{participants.length}</span>
             </div>
             <NetworkIndicator quality={networkQuality} />
           </div>

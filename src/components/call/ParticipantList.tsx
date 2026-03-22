@@ -34,6 +34,7 @@ interface ParticipantListProps {
 
 export function ParticipantList({ isOpen, onClose, isHost = false }: ParticipantListProps) {
   const { useParticipants, useLocalParticipant } = useCallStateHooks();
+  // useParticipants() already includes the local participant
   const participants = useParticipants();
   const localParticipant = useLocalParticipant();
   const [speakingVolumes, setSpeakingVolumes] = useState<Record<string, number>>({});
@@ -65,7 +66,7 @@ export function ParticipantList({ isOpen, onClose, isHost = false }: Participant
     });
   };
 
-  const allParticipants = localParticipant ? [localParticipant, ...participants] : participants;
+  const allParticipants = participants;
 
   return (
     <>
