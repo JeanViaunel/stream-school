@@ -24,12 +24,12 @@ function ControlButton({
       onClick={onClick}
       title={title}
       className={cn(
-        "flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        "group relative flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
         danger
-          ? "bg-red-500 hover:bg-red-400 text-white"
+          ? "bg-red-500/90 hover:bg-red-400 text-white shadow-[0_0_20px_rgba(239,68,68,0.35)] hover:shadow-[0_0_28px_rgba(239,68,68,0.5)]"
           : active
-            ? "bg-white/12 hover:bg-white/20 text-white"
-            : "bg-white/6 hover:bg-white/12 text-white/40"
+            ? "bg-white/12 hover:bg-white/18 text-white border border-white/8"
+            : "bg-white/5 hover:bg-white/10 text-white/35 border border-white/5"
       )}
     >
       {children}
@@ -51,6 +51,11 @@ export function CallControls({ onLeave }: CallControlsProps) {
   const isCamOn = !!localParticipant?.videoStream;
 
   async function handleLeave() {
+    try { await call?.camera.disable(); } catch {}
+    try { await call?.microphone.disable(); } catch {}
+    [localParticipant?.videoStream, localParticipant?.audioStream].forEach(
+      (stream) => stream?.getTracks().forEach((track) => track.stop())
+    );
     await call?.leave();
     onLeave();
   }
@@ -61,7 +66,9 @@ export function CallControls({ onLeave }: CallControlsProps) {
   }
 
   return (
-    <div className="shrink-0 flex items-center justify-center gap-3 px-6 py-4 bg-zinc-950/95 border-t border-white/8 backdrop-blur-sm">
+    <div className="shrink-0 flex items-center justify-center gap-2.5 px-6 py-5"
+      style={{ background: "oklch(0.072 0.022 268 / 95%)", borderTop: "1px solid oklch(1 0 0 / 7%)" }}>
+
       <ControlButton
         onClick={() => call?.microphone.toggle()}
         active={isMicOn}
@@ -92,7 +99,8 @@ export function CallControls({ onLeave }: CallControlsProps) {
         <UserPlus className="h-5 w-5" />
       </ControlButton>
 
-      <div className="w-px h-8 bg-white/12 mx-1" />
+      {/* Divider */}
+      <div className="h-8 w-px bg-white/10 mx-1" />
 
       <ControlButton onClick={handleLeave} danger title="Leave call">
         <PhoneOff className="h-5 w-5" />

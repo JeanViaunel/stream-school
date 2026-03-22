@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { StreamVideoClient, StreamVideo } from "@stream-io/video-react-sdk";
+import { StreamVideoClient, StreamVideo, StreamTheme } from "@stream-io/video-react-sdk";
 import { useCreateChatClient, Chat } from "stream-chat-react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Session } from "@/lib/session";
@@ -51,15 +51,25 @@ function ConnectedProviders({ session, children }: ConnectedProvidersProps) {
 
   if (!chatClient || !videoClient) {
     return (
-      <div className="flex h-screen items-center justify-center text-muted-foreground">
-        Connecting…
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative flex h-12 w-12 items-center justify-center">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/30" />
+            <span className="relative inline-flex h-6 w-6 rounded-full bg-primary/60" />
+          </div>
+          <p className="text-sm text-muted-foreground tracking-wide">Connecting…</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <Chat client={chatClient}>
-      <StreamVideo client={videoClient}>{children}</StreamVideo>
+    <Chat client={chatClient} theme="str-chat__theme-dark">
+      <StreamVideo client={videoClient}>
+        <StreamTheme as="main" className="str-video">
+          {children}
+        </StreamTheme>
+      </StreamVideo>
     </Chat>
   );
 }

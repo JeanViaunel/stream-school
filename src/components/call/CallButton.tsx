@@ -37,7 +37,10 @@ export function CallButton({ channelId }: CallButtonProps) {
       const call = videoClient.call("default", callId);
       await call.getOrCreate({
         ring: true,
-        data: { members },
+        data: {
+          members,
+          custom: { channelCid: channel.cid },
+        },
       });
 
       await channel.sendMessage({

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   useStreamVideoClient,
@@ -20,6 +20,7 @@ export default function CallPage({ params }: CallPageProps) {
   const [call, setCall] = useState<Call | undefined>();
   const [error, setError] = useState<string | null>(null);
   const leftRef = useRef(false);
+  const hasJoinedRef = useRef(false);
 
   useEffect(() => {
     if (!videoClient) return;
@@ -28,8 +29,22 @@ export default function CallPage({ params }: CallPageProps) {
     setCall(c);
 
     const doJoin = async () => {
+      // Prevent multiple join attempts
+      if (hasJoinedRef.current) return;
+      
       const state = c.state.callingState;
       if (state === CallingState.JOINED || state === CallingState.JOINING) return;
+
+      hasJoinedRef.current = true;
+
+      // Probe camera before the SDK tries — avoids unhandled internal rejection
+      try {
+        const probe = await navigator.mediaDevices.getUserMedia({ video: true });
+        probe.getTracks().forEach((t) => t.stop());
+      } catch {
+        await c.camera.disable();
+      }
+
       try {
         await c.join({ create: true });
       } catch (err) {
@@ -48,10 +63,10 @@ export default function CallPage({ params }: CallPageProps) {
     };
   }, [videoClient, callId]);
 
-  function handleLeave() {
+  const handleLeave = useCallback(() => {
     leftRef.current = true;
     router.replace("/messages");
-  }
+  }, [router]);
 
   if (error) {
     return (

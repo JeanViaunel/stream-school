@@ -1,14 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   StreamCall,
   StreamTheme,
   SpeakerLayout,
+  PaginatedGridLayout,
   useCallStateHooks,
   type Call,
+  CallingState,
 } from "@stream-io/video-react-sdk";
-import { CallControls } from "./CallControls";
+import { Users, Clock, Hash } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { FloatingControls } from "./FloatingControls";
+import { NetworkIndicator, NetworkBanner } from "./NetworkIndicator";
+import { ParticipantList } from "./ParticipantList";
+import { SelfView } from "./SelfView";
+import { CallEnded } from "./CallEnded";
+import { CallLobby } from "./CallLobby";
+import { type CallLayout } from "./LayoutSwitcher";
 
 function CallTimer() {
   const { useCallSession } = useCallStateHooks();
@@ -24,13 +34,24 @@ function CallTimer() {
     return () => clearInterval(interval);
   }, [session?.started_at]);
 
-  const mins = Math.floor(elapsed / 60).toString().padStart(2, "0");
-  const secs = (elapsed % 60).toString().padStart(2, "0");
+  const hours = Math.floor(elapsed / 3600);
+  const mins = Math.floor((elapsed % 3600) / 60);
+  const secs = elapsed % 60;
+
+  const timeString = hours > 0
+    ? `${hours}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+    : `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 
   return (
-    <span className="text-sm text-white/60 tabular-nums font-mono">
-      {mins}:{secs}
-    </span>
+    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/30 backdrop-blur-md px-4 py-2">
+      <Clock className="h-3.5 w-3.5 text-white/60" />
+      <span 
+        className="text-sm font-mono text-white tabular-nums tracking-wider"
+        style={{ fontFamily: "var(--font-geist-mono)" }}
+      >
+        {timeString}
+      </span>
+    </div>
   );
 }
 
@@ -39,29 +60,200 @@ interface CallRoomProps {
   onLeave: () => void;
 }
 
+// Inner component that uses Stream SDK hooks (must be inside StreamCall)
+function CallRoomInner({ onLeave }: { onLeave: () => void }) {
+  const { useParticipants, useCallCallingState } = useCallStateHooks();
+  const participants = useParticipants();
+  const callingState = useCallCallingState();
+  const [layout, setLayout] = useState<CallLayout>("spotlight");
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [showCallEnded, setShowCallEnded] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [networkQuality, setNetworkQuality] = useState<"excellent" | "good" | "poor">("excellent");
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastMouseMoveRef = useRef(Date.now());
+  const headerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-hide header after 3s - use ref to avoid re-renders
+  useEffect(() => {
+    const handleMouseMove = () => {
+      lastMouseMoveRef.current = Date.now();
+      setHeaderVisible(true);
+      
+      // Clear existing timeout
+      if (headerTimeoutRef.current) {
+        clearTimeout(headerTimeoutRef.current);
+      }
+      
+      // Set new timeout
+      headerTimeoutRef.current = setTimeout(() => {
+        if (Date.now() - lastMouseMoveRef.current >= 3000) {
+          setHeaderVisible(false);
+        }
+      }, 3000);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    
+    // Initial timeout
+    headerTimeoutRef.current = setTimeout(() => {
+      setHeaderVisible(false);
+    }, 3000);
+    
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      if (headerTimeoutRef.current) {
+        clearTimeout(headerTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Track call duration
+  useEffect(() => {
+    if (callingState !== CallingState.JOINED) return;
+    const interval = setInterval(() => {
+      setCallDuration((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [callingState]);
+
+  // Handle call end
+  const handleLeave = async () => {
+    // Call leave will be handled by the call object
+    setShowCallEnded(true);
+  };
+
+  const handleRejoin = () => {
+    setShowCallEnded(false);
+    // Reload the page to rejoin
+    window.location.reload();
+  };
+
+  const handleCloseCallEnded = () => {
+    setShowCallEnded(false);
+    onLeave();
+  };
+
+  // Render the appropriate video layout
+  const renderVideoLayout = () => {
+    switch (layout) {
+      case "grid":
+        return <PaginatedGridLayout groupSize={16} />;
+      case "sidebar":
+        return <SpeakerLayout participantsBarPosition="right" />;
+      case "spotlight":
+      default:
+        return <SpeakerLayout participantsBarPosition="bottom" />;
+    }
+  };
+
+  if (showCallEnded) {
+    return (
+      <CallEnded
+        duration={callDuration}
+        participantCount={participants.length + 1}
+        onRejoin={handleRejoin}
+        onClose={handleCloseCallEnded}
+      />
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-950 overflow-hidden">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950/20 to-slate-950" />
+      
+      {/* Noise texture */}
+      <div 
+        className="absolute inset-0 opacity-[0.02]"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+        }}
+      />
+
+      {/* Header - auto-hiding */}
+      <div 
+        className={cn(
+          "absolute top-0 left-0 right-0 z-40 transition-all duration-300 px-6 py-4",
+          headerVisible 
+            ? "opacity-100 translate-y-0" 
+            : "opacity-0 -translate-y-full pointer-events-none"
+        )}
+      >
+        <div className="flex items-center justify-between">
+          {/* Left: Call info */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 rounded-full border border-white/10 bg-black/30 backdrop-blur-md px-4 py-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border border-purple-500/30">
+                <Hash className="h-4 w-4 text-purple-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white" style={{ fontFamily: "var(--font-syne)" }}>
+                  Video Call
+                </p>
+                <p className="text-xs text-white/40">Stream School</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Center: Timer */}
+          <CallTimer />
+
+          {/* Right: Stats */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/30 backdrop-blur-md px-3 py-2">
+              <Users className="h-4 w-4 text-white/60" />
+              <span className="text-sm text-white/80">{participants.length + 1}</span>
+            </div>
+            <NetworkIndicator quality={networkQuality} />
+          </div>
+        </div>
+      </div>
+
+      {/* Network quality banner */}
+      <NetworkBanner quality={networkQuality} />
+
+      {/* Main video area */}
+      <StreamTheme className="relative w-full h-full">
+        <div className="absolute inset-0 flex items-center justify-center p-4 pt-20 pb-24">
+          <div className={cn(
+            "w-full h-full transition-all duration-400",
+            showParticipants && "mr-80",
+            showChat && "ml-80"
+          )}>
+            {renderVideoLayout()}
+          </div>
+        </div>
+      </StreamTheme>
+
+      {/* Self-view (Picture-in-Picture) */}
+      <SelfView />
+
+      {/* Participant list panel */}
+      <ParticipantList
+        isOpen={showParticipants}
+        onClose={() => setShowParticipants(false)}
+      />
+
+      {/* Floating controls */}
+      <FloatingControls
+        onLeave={handleLeave}
+        onToggleParticipants={() => setShowParticipants(!showParticipants)}
+        onToggleChat={() => setShowChat(!showChat)}
+        currentLayout={layout}
+        onLayoutChange={setLayout}
+        isParticipantsOpen={showParticipants}
+        isChatOpen={showChat}
+      />
+    </div>
+  );
+}
+
 export function CallRoom({ call, onLeave }: CallRoomProps) {
   return (
     <StreamCall call={call}>
-      <div className="flex flex-col h-full bg-zinc-950">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/8 bg-zinc-950/95 backdrop-blur-sm shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-sm font-semibold text-white tracking-wide">
-              Video Call
-            </span>
-          </div>
-          <CallTimer />
-        </div>
-
-        {/* Video area */}
-        <StreamTheme className="flex-1 min-h-0">
-          <SpeakerLayout />
-        </StreamTheme>
-
-        {/* Controls */}
-        <CallControls onLeave={onLeave} />
-      </div>
+      <CallRoomInner onLeave={onLeave} />
     </StreamCall>
   );
 }
