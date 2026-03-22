@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useStreamVideoClient } from "@stream-io/video-react-sdk";
+import { useStreamVideoClient, useCalls, CallingState } from "@stream-io/video-react-sdk";
 import { useChannelStateContext, useChatContext } from "stream-chat-react";
 import { Video, PhoneCall } from "lucide-react";
 import {
@@ -82,7 +82,12 @@ export function CallButton() {
     }
   }
 
-  const isActive = Boolean(activeCallId);
+  const calls = useCalls();
+  const hasActiveCall = Boolean(activeCallId);
+  // Pulsing indicator only when this user has actually joined the call
+  const isInCall = calls.some(
+    (c) => c.id === activeCallId && c.state.callingState === CallingState.JOINED
+  );
 
   return (
     <TooltipProvider>
@@ -95,14 +100,16 @@ export function CallButton() {
               className={cn(
                 "group relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200",
                 "disabled:cursor-not-allowed disabled:opacity-40",
-                isActive
+                isInCall
                   ? "text-emerald-400 hover:bg-emerald-400/10"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  : hasActiveCall
+                    ? "text-amber-400 hover:bg-amber-400/10"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
               )}
             />
           }
         >
-          {isActive ? (
+          {isInCall ? (
             <>
               <span className="absolute inset-0 animate-ping rounded-lg bg-emerald-400/15" />
               <PhoneCall className="relative h-4 w-4" />
@@ -112,7 +119,7 @@ export function CallButton() {
           )}
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          {isActive ? "Join ongoing call" : "Start video call"}
+          {isInCall ? "In call" : hasActiveCall ? "Join ongoing call" : "Start video call"}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
