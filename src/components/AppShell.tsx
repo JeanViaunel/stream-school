@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { StreamContext } from "@/contexts/StreamContext";
 import { UIActionsProvider } from "@/contexts/UIActionsContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 import { IncomingCallModal } from "@/components/call/IncomingCallModal";
 import { CommandPalette } from "@/components/CommandPalette";
+import { NotificationManager } from "@/components/NotificationManager";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function AppLoadingScreen() {
@@ -54,12 +56,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <UIActionsProvider>
-      <StreamContext>
-        <CommandPalette />
-        <IncomingCallModal />
-        {children}
-      </StreamContext>
-    </UIActionsProvider>
+    <SettingsProvider>
+      <UIActionsProvider>
+        <StreamContext>
+          <CommandPalette />
+          <IncomingCallModal />
+          <NotificationManager />
+          {children}
+        </StreamContext>
+      </UIActionsProvider>
+    </SettingsProvider>
   );
 }

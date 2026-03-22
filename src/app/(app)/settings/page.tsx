@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { useSettings } from "@/contexts/SettingsContext";
+import { type AppSettings } from "@/lib/settings";
+import { toast } from "sonner";
+
+interface SettingItem {
+  id: keyof AppSettings;
+  label: string;
+  description: string;
+}
 
 interface SettingGroup {
   title: string;
-  items: {
-    id: string;
-    label: string;
-    description: string;
-    defaultValue: boolean;
-  }[];
+  items: SettingItem[];
 }
 
 const SETTING_GROUPS: SettingGroup[] = [
@@ -22,14 +25,12 @@ const SETTING_GROUPS: SettingGroup[] = [
       {
         id: "desktopNotifications",
         label: "Desktop Notifications",
-        description: "Show notifications for new messages",
-        defaultValue: true,
+        description: "Show browser notifications for new messages when the window is in the background",
       },
       {
         id: "messagePreview",
         label: "Message Preview",
-        description: "Show message content in notifications",
-        defaultValue: true,
+        description: "Show message content in notifications (disable for privacy)",
       },
     ],
   },
@@ -39,14 +40,12 @@ const SETTING_GROUPS: SettingGroup[] = [
       {
         id: "messageSounds",
         label: "Message Sounds",
-        description: "Play a sound when you receive a message",
-        defaultValue: true,
+        description: "Play a sound when you receive a new message",
       },
       {
         id: "callSounds",
         label: "Call Sounds",
-        description: "Play ringtone for incoming calls",
-        defaultValue: true,
+        description: "Play a ringtone for incoming video/audio calls",
       },
     ],
   },
@@ -55,15 +54,13 @@ const SETTING_GROUPS: SettingGroup[] = [
     items: [
       {
         id: "readReceipts",
-        label: "Read Receipts",
-        description: "Let others know when you've read their messages",
-        defaultValue: true,
+        label: "Send Read Receipts",
+        description: "Let others know when you've opened and read their messages",
       },
       {
         id: "typingIndicators",
         label: "Typing Indicators",
-        description: "Show when you're typing to others",
-        defaultValue: true,
+        description: "Show the typing indicator when you are composing a message",
       },
     ],
   },
@@ -73,50 +70,19 @@ const SETTING_GROUPS: SettingGroup[] = [
       {
         id: "compactMode",
         label: "Compact Mode",
-        description: "Display messages in a more compact layout",
-        defaultValue: false,
+        description: "Reduce spacing and font size for a denser message layout",
       },
       {
         id: "animations",
         label: "Animations",
-        description: "Enable UI transition animations",
-        defaultValue: true,
+        description: "Enable UI transition and motion animations throughout the app",
       },
     ],
   },
 ];
 
-function loadSettings(): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
-  try {
-    const stored = localStorage.getItem("appSettings");
-    return stored ? JSON.parse(stored) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveSettings(settings: Record<string, boolean>) {
-  localStorage.setItem("appSettings", JSON.stringify(settings));
-}
-
 export default function SettingsPage() {
-  const [values, setValues] = useState<Record<string, boolean>>(() => {
-    const stored = loadSettings();
-    const defaults: Record<string, boolean> = {};
-    SETTING_GROUPS.forEach((group) =>
-      group.items.forEach((item) => {
-        defaults[item.id] = item.id in stored ? stored[item.id] : item.defaultValue;
-      })
-    );
-    return defaults;
-  });
-
-  function handleToggle(id: string, value: boolean) {
-    const next = { ...values, [id]: value };
-    setValues(next);
-    saveSettings(next);
-  }
+  const { settings, updateSetting } = useSettings();
 
   return (
     <div className="flex h-screen bg-background">
@@ -137,7 +103,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-8">
-            {SETTING_GROUPS.map((group, gi) => (
+            {SETTING_GROUPS.map((group) => (
               <div key={group.title}>
                 <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                   {group.title}
@@ -153,8 +119,11 @@ export default function SettingsPage() {
                           </p>
                         </div>
                         <Switch
-                          checked={values[item.id] ?? item.defaultValue}
-                          onCheckedChange={(v) => handleToggle(item.id, v)}
+                          checked={settings[item.id] as boolean}
+                          onCheckedChange={(v) => {
+                            updateSetting(item.id, v);
+                            toast.success(`${item.label} ${v ? "enabled" : "disabled"}`);
+                          }}
                         />
                       </div>
                       {i < group.items.length - 1 && (

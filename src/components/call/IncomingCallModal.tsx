@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   useCalls,
@@ -11,12 +11,28 @@ import {
 } from "@stream-io/video-react-sdk";
 import { Phone, PhoneOff, Video, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSettings } from "@/contexts/SettingsContext";
+import { startRingtone } from "@/lib/settings";
 
 function IncomingCallPanel({ call }: { call: Call }) {
   const router = useRouter();
   const { useCallCallingState } = useCallStateHooks();
   const callingState = useCallCallingState();
   const [countdown, setCountdown] = useState(30);
+  const { settings } = useSettings();
+  const stopRingtoneRef = useRef<(() => void) | null>(null);
+
+  // Start / stop ringtone based on callSounds setting and ringing state
+  useEffect(() => {
+    if (settings.callSounds && callingState === CallingState.RINGING) {
+      stopRingtoneRef.current = startRingtone();
+    }
+    return () => {
+      stopRingtoneRef.current?.();
+      stopRingtoneRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.callSounds, callingState]);
 
   useEffect(() => {
     if (countdown <= 0) {

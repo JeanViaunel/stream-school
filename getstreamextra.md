@@ -196,3 +196,29 @@ Note: **`ui-cookbook/ringing-call`** is the customization guide; **`ui-component
 | Production hardening | `advanced/integration-best-practices.md` |
 
 For **Stream Chat** (channels, messages, DMs), use `getstream.md` and the Chat docs linked there.
+
+---
+
+## EDU "which page?" map — StreamSchool K–12 additions
+
+Use this table when implementing features described in `SPECS-EDU.md` and `EDU-TASKS.md`. These topics are in the index above but were not in the original "which page?" map.
+
+| EDU Feature | Start here |
+|-------------|------------|
+| **Lobby / waiting room** (student waits, teacher admits) | https://getstream.io/video/docs/react/ui-cookbook/lobby-preview.md |
+| **Mute a single participant** | https://getstream.io/video/docs/react/guides/permissions-and-moderation.md + https://getstream.io/video/docs/react/moderation/audio-video.md |
+| **Remove a participant from call** | https://getstream.io/video/docs/react/guides/permissions-and-moderation.md |
+| **Grant / revoke per-user call permissions** (screenshare, unmute-self) | https://getstream.io/video/docs/react/guides/permissions-and-moderation.md + https://getstream.io/video/docs/react/call_types/permissions.md |
+| **Custom `classroom` call type** (create in dashboard, configure server-side) | https://getstream.io/video/docs/react/call_types/manage.md + https://getstream.io/video/docs/react/call_types/settings.md + https://getstream.io/video/docs/react/call_types/permissions.md |
+| **Recording a call** (`call.startRecording`, webhook for storage) | https://getstream.io/video/docs/react/recording/calls.md + https://getstream.io/video/docs/react/recording/storage.md |
+| **Transcriptions / live captions** (`call.startTranscription`) | https://getstream.io/video/docs/react/transcribing/calls.md + https://getstream.io/video/docs/react/transcribing/storage.md |
+| **Custom events in-call** (raised hands, poll launched, breakout assigned) | https://getstream.io/video/docs/react/guides/custom-events.md |
+| **Stream Video webhooks** (join/leave for attendance, recording ready) | https://getstream.io/video/docs/react/webhooks/overview.md |
+| **Stream Chat message moderation / flagging** | https://getstream.io/chat/docs/react/moderation.md |
+| **Stream Chat webhooks** (`message.new` for pre-delivery moderation) | https://getstream.io/chat/docs/react/webhooks_overview.md |
+| **Stream Chat custom channel type** (`classroom` type configuration) | https://getstream.io/chat/docs/react/channel_features.md |
+| **Querying call members** (roster, attendance list) | https://getstream.io/video/docs/react/guides/querying-call-members.md |
+| **Reactions in-call** (emoji reactions from students) | https://getstream.io/video/docs/react/guides/reactions.md |
+| **GDPR / data deletion via Stream** (delete user messages on account close) | https://getstream.io/video/docs/react/gdpr/overview.md |
+| **Participant sorting** (teacher pinned at top of grid) | https://getstream.io/video/docs/react/guides/sorting-api.md |
+| **Connection quality / network indicator** (extend for class view) | https://getstream.io/video/docs/react/ui-cookbook/network-quality-indicator.md + https://getstream.io/video/docs/react/ui-cookbook/connection-unstable.md |

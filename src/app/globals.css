@@ -661,3 +661,32 @@ html {
 [disabled] {
   cursor: not-allowed;
 }
+
+/* ── Settings: Compact Mode ── */
+html.compact-mode .str-chat__message-simple {
+  padding-block: 0.1rem;
+}
+html.compact-mode .str-chat__message-text {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+html.compact-mode .str-chat__avatar {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+}
+html.compact-mode .str-chat__message-sender-name {
+  font-size: 0.75rem;
+}
+html.compact-mode .str-chat__li {
+  margin-block: 0.05rem;
+}
+
+/* ── Settings: Disable Animations ── */
+html.no-animations *,
+html.no-animations *::before,
+html.no-animations *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

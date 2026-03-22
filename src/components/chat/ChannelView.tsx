@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Search, Info, MoreVertical, ChevronLeft, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useSettings } from "@/contexts/SettingsContext";
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -263,10 +264,19 @@ function CustomMessageList() {
   );
 }
 
+function NoopTypingIndicator() {
+  return null;
+}
+
 export function ChannelView() {
+  const { settings } = useSettings();
+
   return (
     <div className="flex h-full w-full flex-col">
-      <Channel>
+      <Channel
+        markReadOnMount={settings.readReceipts}
+        TypingIndicator={settings.typingIndicators ? undefined : NoopTypingIndicator}
+      >
         <Window>
           <CustomChannelHeader />
           <CustomMessageList />
