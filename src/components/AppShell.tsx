@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { StreamContext } from "@/contexts/StreamContext";
+import { UIActionsProvider } from "@/contexts/UIActionsContext";
 import { IncomingCallModal } from "@/components/call/IncomingCallModal";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -53,10 +54,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <StreamContext>
-      <CommandPalette />
-      <IncomingCallModal />
-      {children}
-    </StreamContext>
+    <UIActionsProvider>
+      <StreamContext>
+        <CommandPalette />
+        <IncomingCallModal />
+        {children}
+      </StreamContext>
+    </UIActionsProvider>
   );
 }

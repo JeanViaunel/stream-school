@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useCallStateHooks, type Call } from "@stream-io/video-react-sdk";
+import { toast } from "sonner";
 import {
   Users,
   X,
@@ -53,6 +54,7 @@ export function ParticipantList({
   const [pinnedParticipants, setPinnedParticipants] = useState<Set<string>>(
     new Set()
   );
+  const [loadingActions, setLoadingActions] = useState<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
 
   // Track speaking volumes
@@ -80,6 +82,40 @@ export function ParticipantList({
   }, [speakingVolumes]);
 
   const hostUserId = call?.state.createdBy?.id;
+
+  const handleMute = async (sessionId: string, userId: string, name: string) => {
+    const key = `${sessionId}:mute`;
+    setLoadingActions((prev) => new Set(prev).add(key));
+    try {
+      await call?.muteUser(userId, "audio");
+      toast.success(`${name || userId} muted`);
+    } catch {
+      toast.error("Failed to mute");
+    } finally {
+      setLoadingActions((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const handleRemove = async (sessionId: string, userId: string) => {
+    const key = `${sessionId}:remove`;
+    setLoadingActions((prev) => new Set(prev).add(key));
+    try {
+      await call?.blockUser(userId);
+      toast.success("Removed from call");
+    } catch {
+      toast.error("Failed to remove");
+    } finally {
+      setLoadingActions((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
 
   const handlePin = (sessionId: string) => {
     setPinnedParticipants((prev) => {
@@ -143,6 +179,8 @@ export function ParticipantList({
             const isCallHost =
               (isLocal && isHost) ||
               (!!hostUserId && participant.userId === hostUserId);
+            const isMuting = loadingActions.has(`${participant.sessionId}:mute`);
+            const isRemoving = loadingActions.has(`${participant.sessionId}:remove`);
 
             return (
               <div
@@ -245,13 +283,21 @@ export function ParticipantList({
                         align="end"
                         className="glass-strong border-white/10"
                       >
-                        <DropdownMenuItem className="text-white/80 hover:text-white hover:bg-white/10">
+                        <DropdownMenuItem
+                          className="text-white/80 hover:text-white hover:bg-white/10"
+                          disabled={isMuting}
+                          onClick={() => handleMute(participant.sessionId, participant.userId, participant.name ?? "")}
+                        >
                           <MicOff className="h-4 w-4 mr-2" />
-                          Mute for all
+                          {isMuting ? "Muting…" : "Mute for all"}
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                        <DropdownMenuItem
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          disabled={isRemoving}
+                          onClick={() => handleRemove(participant.sessionId, participant.userId)}
+                        >
                           <X className="h-4 w-4 mr-2" />
-                          Remove from call
+                          {isRemoving ? "Removing…" : "Remove from call"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

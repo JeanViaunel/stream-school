@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/command"
 import { useChatContext } from "stream-chat-react"
 import { useAuth } from "@/contexts/AuthContext"
+import { useUIActions } from "@/contexts/UIActionsContext"
 import { 
   MessageSquare, 
   Video, 
@@ -30,6 +31,7 @@ export function CommandPalette() {
   const router = useRouter()
   const { client, setActiveChannel } = useChatContext()
   const { session, logout } = useAuth()
+  const { openDMModal, openGroupModal } = useUIActions()
   const [channels, setChannels] = useState<any[]>([])
 
   useEffect(() => {
@@ -66,12 +68,12 @@ export function CommandPalette() {
 
   const handleNewDM = () => {
     setOpen(false)
-    toast.info("Use the + button in the sidebar to start a new DM")
+    openDMModal()
   }
 
   const handleNewGroup = () => {
     setOpen(false)
-    toast.info("Use the group button in the sidebar to create a group")
+    openGroupModal()
   }
 
   const handleLogout = () => {

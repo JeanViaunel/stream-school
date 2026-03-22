@@ -227,3 +227,7 @@ NEXT_PUBLIC_CONVEX_URL=
 - Message encryption
 - Call recording
 - Admin dashboard
+- Background blur / video effects (requires MediaPipe or canvas pipeline — external lib dependency)
+- Settings page UI
+- Effects & backgrounds panel
+- In-call mic volume visualizer using real audio track (Stream SDK does not expose raw audio levels via React hooks; AudioContext integration is deferred)

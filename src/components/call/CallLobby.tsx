@@ -45,39 +45,70 @@ export function CallLobby({
 }: CallLobbyProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [backgroundBlur, setBackgroundBlur] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState("default");
+  const [selectedDevice, setSelectedDevice] = useState("");
+  const [selectedMicDevice, setSelectedMicDevice] = useState("");
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
+  const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
   const [volume, setVolume] = useState(0);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const onJoinRef = useRef(onJoin);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+
   // Keep ref up to date with the latest callback
   useEffect(() => {
     onJoinRef.current = onJoin;
   }, [onJoin]);
 
+  // Enumerate media devices on mount and on device change
+  useEffect(() => {
+    const enumerateDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter((d) => d.kind === "videoinput");
+        const mics = devices.filter((d) => d.kind === "audioinput");
+        setCameraDevices(cameras);
+        setMicDevices(mics);
+        setSelectedDevice((prev) => (prev === "" ? (cameras[0]?.deviceId ?? "") : prev));
+        setSelectedMicDevice((prev) => (prev === "" ? (mics[0]?.deviceId ?? "") : prev));
+      } catch (err) {
+        console.error("Failed to enumerate devices:", err);
+      }
+    };
+
+    enumerateDevices();
+    navigator.mediaDevices.addEventListener("devicechange", enumerateDevices);
+    return () => {
+      navigator.mediaDevices.removeEventListener("devicechange", enumerateDevices);
+    };
+  }, []);
+
   // Initialize camera preview
   useEffect(() => {
     let stream: MediaStream | null = null;
-    
+
     const initCamera = async () => {
       if (!isCameraEnabled) {
         if (videoStream) {
-          videoStream.getTracks().forEach(track => track.stop());
+          videoStream.getTracks().forEach((track) => track.stop());
           setVideoStream(null);
         }
         return;
       }
-      
+
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }, 
-          audio: false 
+        const videoConstraint: MediaTrackConstraints = selectedDevice
+          ? { deviceId: { exact: selectedDevice }, width: { ideal: 1280 }, height: { ideal: 720 } }
+          : { width: { ideal: 1280 }, height: { ideal: 720 } };
+
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: videoConstraint,
+          audio: false,
         });
         setVideoStream(stream);
         if (videoRef.current) {
@@ -87,15 +118,15 @@ export function CallLobby({
         console.error("Failed to get camera:", err);
       }
     };
-    
+
     initCamera();
-    
+
     return () => {
       if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [isCameraEnabled]);
+  }, [isCameraEnabled, selectedDevice]);
 
   // Update video element when stream changes
   useEffect(() => {
@@ -104,21 +135,103 @@ export function CallLobby({
     }
   }, [videoStream]);
 
-  // Simulate volume for visualizer - only update every 200ms to reduce re-renders
+  // Real mic volume via AudioContext
   useEffect(() => {
     if (!isMicEnabled) {
       setVolume(0);
+
+      if (animFrameRef.current !== null) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      if (analyserRef.current) {
+        analyserRef.current.disconnect();
+        analyserRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
       return;
     }
-    intervalRef.current = setInterval(() => {
-      setVolume(Math.random() * 60 + 20);
-    }, 200);
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+
+    let cancelled = false;
+
+    const startAudio = async () => {
+      try {
+        const audioConstraint: MediaTrackConstraints | boolean = selectedMicDevice
+          ? { deviceId: { exact: selectedMicDevice } }
+          : true;
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: audioConstraint,
+          video: false,
+        });
+
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        micStreamRef.current = stream;
+
+        const audioContext = new AudioContext();
+        audioContextRef.current = audioContext;
+
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        analyserRef.current = analyser;
+
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const tick = () => {
+          if (cancelled) return;
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = (sum / dataArray.length / 255) * 100;
+          setVolume(avg);
+          animFrameRef.current = requestAnimationFrame(tick);
+        };
+
+        animFrameRef.current = requestAnimationFrame(tick);
+      } catch (err) {
+        console.error("Failed to get microphone:", err);
       }
     };
-  }, [isMicEnabled]);
+
+    startAudio();
+
+    return () => {
+      cancelled = true;
+
+      if (animFrameRef.current !== null) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      if (analyserRef.current) {
+        analyserRef.current.disconnect();
+        analyserRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
+    };
+  }, [isMicEnabled, selectedMicDevice]);
 
   // Countdown effect
   useEffect(() => {
@@ -141,7 +254,19 @@ export function CallLobby({
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
+        videoStream.getTracks().forEach((track) => track.stop());
+      }
+      if (animFrameRef.current !== null) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+      if (analyserRef.current) {
+        analyserRef.current.disconnect();
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+      }
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
   }, []);
@@ -150,9 +275,9 @@ export function CallLobby({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/50 via-slate-950 to-purple-950/30" />
-      
+
       {/* Noise texture */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
@@ -172,10 +297,10 @@ export function CallLobby({
                 playsInline
                 className="w-full h-full object-cover"
               />
-              
+
               {/* Preview overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-              
+
               {/* Camera off state */}
               {!isCameraEnabled && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60">
@@ -190,7 +315,7 @@ export function CallLobby({
               <div className="absolute top-4 left-4 flex items-center gap-2">
                 <div className={cn(
                   "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-                  isMicEnabled 
+                  isMicEnabled
                     ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                     : "bg-red-500/20 text-red-400 border border-red-500/30"
                 )}>
@@ -199,7 +324,7 @@ export function CallLobby({
                 </div>
                 <div className={cn(
                   "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-                  isCameraEnabled 
+                  isCameraEnabled
                     ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                     : "bg-red-500/20 text-red-400 border border-red-500/30"
                 )}>
@@ -261,14 +386,29 @@ export function CallLobby({
                 <label className="text-xs font-medium text-white/60 uppercase tracking-wider">
                   Camera
                 </label>
-                <Select value={selectedDevice} onValueChange={(value) => setSelectedDevice(value || "default")}>
+                <Select
+                  value={selectedDevice}
+                  onValueChange={(value) => setSelectedDevice(value)}
+                >
                   <SelectTrigger className="bg-white/5 border-white/10 text-white hover:bg-white/10">
                     <SelectValue placeholder="Select camera" />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-900 border-white/10">
-                    <SelectItem value="default" className="text-white hover:bg-white/10">Default Camera</SelectItem>
-                    <SelectItem value="front" className="text-white hover:bg-white/10">Front Camera</SelectItem>
-                    <SelectItem value="back" className="text-white hover:bg-white/10">Back Camera</SelectItem>
+                    {cameraDevices.length === 0 ? (
+                      <SelectItem value="default" disabled className="text-white/40">
+                        No camera found
+                      </SelectItem>
+                    ) : (
+                      cameraDevices.map((d, i) => (
+                        <SelectItem
+                          key={d.deviceId}
+                          value={d.deviceId}
+                          className="text-white hover:bg-white/10"
+                        >
+                          {d.label || `Camera ${i + 1}`}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -278,13 +418,29 @@ export function CallLobby({
                 <label className="text-xs font-medium text-white/60 uppercase tracking-wider">
                   Microphone
                 </label>
-                <Select defaultValue="default">
+                <Select
+                  value={selectedMicDevice}
+                  onValueChange={(value) => setSelectedMicDevice(value)}
+                >
                   <SelectTrigger className="bg-white/5 border-white/10 text-white hover:bg-white/10">
                     <SelectValue placeholder="Select microphone" />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-900 border-white/10">
-                    <SelectItem value="default" className="text-white hover:bg-white/10">Default Microphone</SelectItem>
-                    <SelectItem value="headset" className="text-white hover:bg-white/10">Headset Microphone</SelectItem>
+                    {micDevices.length === 0 ? (
+                      <SelectItem value="default" disabled className="text-white/40">
+                        No microphone found
+                      </SelectItem>
+                    ) : (
+                      micDevices.map((d, i) => (
+                        <SelectItem
+                          key={d.deviceId}
+                          value={d.deviceId}
+                          className="text-white hover:bg-white/10"
+                        >
+                          {d.label || `Microphone ${i + 1}`}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -321,7 +477,7 @@ export function CallLobby({
                 onClick={() => countdown === null ? setCountdown(3) : setCountdown(null)}
                 className={cn(
                   "flex-1 h-12 gap-2 transition-all duration-300",
-                  countdown !== null 
+                  countdown !== null
                     ? "bg-emerald-500 hover:bg-emerald-600"
                     : "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
                 )}

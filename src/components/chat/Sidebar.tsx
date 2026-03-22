@@ -26,17 +26,18 @@ import {
   Plus,
   Users,
   MessageCircle,
-  RefreshCw,
   Inbox,
-  Hash,
-  Bell,
-  BellOff,
-  Pin,
-  Link2,
-  CheckCheck,
-  LogOut,
   AlertTriangle,
+  LogOut,
 } from "lucide-react";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { useUIActionsRegistry } from "@/contexts/UIActionsContext";
 import { NewGroupModal } from "./NewGroupModal";
 import { UserSearchModal } from "./UserSearchModal";
 import { UserMenu } from "./UserMenu";
@@ -57,10 +58,13 @@ export function Sidebar() {
   const { client, setActiveChannel } = useChatContext();
   const videoClient = useStreamVideoClient();
   
+  const { registerDMOpener, registerGroupOpener } = useUIActionsRegistry();
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showDMModal, setShowDMModal] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [pinnedChannelIds, setPinnedChannelIds] = useState<Set<string>>(new Set());
+  const [mutedChannelIds, setMutedChannelIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [channelList, setChannelList] = useState<ChannelListState>({ channels: [], loading: true });
   const [expandedSections, setExpandedSections] = useState({
@@ -92,6 +96,30 @@ export function Sidebar() {
   useEffect(() => {
     fetchChannels();
   }, [fetchChannels]);
+
+  // Register modal openers with UIActionsContext so CommandPalette can trigger them
+  useEffect(() => {
+    registerDMOpener(() => setShowDMModal(true));
+    registerGroupOpener(() => setShowGroupModal(true));
+  }, [registerDMOpener, registerGroupOpener]);
+
+  // Load pinned channels from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem("pinnedChannels");
+    if (stored) {
+      try { setPinnedChannelIds(new Set(JSON.parse(stored))); } catch { /* ignore */ }
+    }
+  }, []);
+
+  // Initialise muted channel IDs from already-loaded channels
+  useEffect(() => {
+    if (channelList.channels.length === 0) return;
+    const muted = new Set<string>();
+    channelList.channels.forEach((ch) => {
+      if (ch.muteStatus().muted) muted.add(ch.id!);
+    });
+    setMutedChannelIds(muted);
+  }, [channelList.channels]);
   
   // Filter channels based on search
   const filteredChannels = useMemo(() => {
@@ -124,8 +152,11 @@ export function Sidebar() {
       }
     });
     
-    return { directMessages: dms, groupChats: groups };
-  }, [filteredChannels]);
+    const sortByPin = (arr: Channel[]) =>
+    [...arr].sort((a, b) => (pinnedChannelIds.has(b.id!) ? 1 : 0) - (pinnedChannelIds.has(a.id!) ? 1 : 0));
+
+  return { directMessages: sortByPin(dms), groupChats: sortByPin(groups) };
+  }, [filteredChannels, pinnedChannelIds]);
   
   async function handleDMSelect(userId: string) {
     try {
@@ -153,73 +184,67 @@ export function Sidebar() {
     toast.success("Logged out successfully");
   }
   
-  function handleContextMenu(e: React.MouseEvent, channel: Channel) {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Create a custom context menu
-    const menuItems = [
-      {
-        label: channel.state.unreadCount ? "Mark as Read" : "Mark as Unread",
-        icon: CheckCheck,
-        action: () => {
-          if (channel.state.unreadCount) {
-            channel.markRead();
-            toast.success("Marked as read");
-          } else {
-            // Mark as unread by sending a dummy event or similar
-            toast.success("Marked as unread");
-          }
-        },
-      },
-      {
-        label: "Mute Notifications",
-        icon: BellOff,
-        action: () => toast.success("Notifications muted"),
-      },
-      {
-        label: "Pin to Top",
-        icon: Pin,
-        action: () => toast.success("Pinned to top"),
-      },
-      {
-        label: "Copy Link",
-        icon: Link2,
-        action: () => {
-          navigator.clipboard.writeText(`${window.location.origin}/messages/${channel.id}`);
-          toast.success("Link copied to clipboard");
-        },
-      },
-    ];
-    
-    const memberCount = Object.keys(channel.state.members).length;
-    if (memberCount > 2) {
-      menuItems.push({
-        label: "Leave Group",
-        icon: LogOut,
-        action: () => {
-          channel.removeMembers([session!.streamUserId]);
-          toast.success("Left group successfully");
-        },
-      });
+  function handleMarkRead(channel: Channel) {
+    if (channel.state.unreadCount) {
+      channel.markRead();
+      toast.success("Marked as read");
+    } else {
+      const firstMessage = channel.state.messages[0];
+      if (firstMessage?.id) {
+        channel.markUnread({ message_id: firstMessage.id }).catch(() => {});
+      }
+      toast.success("Marked as unread");
     }
-    
-    // Show toast with action info for now
-    toast.info("Right-click menu: " + menuItems.map(i => i.label).join(", "));
   }
-  
-  function handleSidebarContextMenu(e: React.MouseEvent) {
-    e.preventDefault();
-    toast.info("Right-click menu: Create DM, Create Group, Refresh");
+
+  async function handleToggleMute(channel: Channel) {
+    const isMuted = mutedChannelIds.has(channel.id!);
+    try {
+      if (isMuted) {
+        await channel.unmute();
+        setMutedChannelIds((prev) => { const next = new Set(prev); next.delete(channel.id!); return next; });
+        toast.success("Notifications unmuted");
+      } else {
+        await channel.mute();
+        setMutedChannelIds((prev) => new Set(prev).add(channel.id!));
+        toast.success("Notifications muted");
+      }
+    } catch {
+      toast.error("Failed to update notification settings");
+    }
+  }
+
+  function handleTogglePin(channel: Channel) {
+    setPinnedChannelIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(channel.id!)) {
+        next.delete(channel.id!);
+        toast.success("Unpinned");
+      } else {
+        next.add(channel.id!);
+        toast.success("Pinned to top");
+      }
+      localStorage.setItem("pinnedChannels", JSON.stringify([...next]));
+      return next;
+    });
+  }
+
+  function handleCopyLink(channel: Channel) {
+    navigator.clipboard.writeText(`${window.location.origin}/messages/${channel.id}`);
+    toast.success("Link copied to clipboard");
+  }
+
+  function handleLeaveGroup(channel: Channel) {
+    channel.removeMembers([session!.streamUserId]);
+    toast.success("Left group successfully");
   }
   
   const hasConversations = directMessages.length > 0 || groupChats.length > 0;
   
   return (
     <TooltipProvider>
-      <aside 
+      <aside
         className="flex w-72 shrink-0 flex-col border-r border-border/60 bg-sidebar relative"
-        onContextMenu={handleSidebarContextMenu}
       >
         {/* ── Header ── */}
         <div className="flex items-center justify-between gap-2 px-4 py-4">
@@ -329,12 +354,27 @@ export function Sidebar() {
                     )}
                   >
                     {directMessages.map((channel, index) => (
-                      <div 
-                        key={channel.id} 
-                        onContextMenu={(e) => handleContextMenu(e, channel)}
-                      >
-                        <ChannelItem channel={channel} index={index} />
-                      </div>
+                      <ContextMenu key={channel.id}>
+                        <ContextMenuTrigger asChild>
+                          <div>
+                            <ChannelItem channel={channel} index={index} />
+                          </div>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent className="w-52">
+                          <ContextMenuItem onClick={() => handleMarkRead(channel)}>
+                            {channel.state.unreadCount ? "Mark as Read" : "Mark as Unread"}
+                          </ContextMenuItem>
+                          <ContextMenuItem onClick={() => handleToggleMute(channel)}>
+                            {mutedChannelIds.has(channel.id!) ? "Unmute Notifications" : "Mute Notifications"}
+                          </ContextMenuItem>
+                          <ContextMenuItem onClick={() => handleTogglePin(channel)}>
+                            {pinnedChannelIds.has(channel.id!) ? "Unpin from Top" : "Pin to Top"}
+                          </ContextMenuItem>
+                          <ContextMenuItem onClick={() => handleCopyLink(channel)}>
+                            Copy Link
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
                     ))}
                   </div>
                 </div>
@@ -356,12 +396,34 @@ export function Sidebar() {
                     )}
                   >
                     {groupChats.map((channel, index) => (
-                      <div 
-                        key={channel.id}
-                        onContextMenu={(e) => handleContextMenu(e, channel)}
-                      >
-                        <ChannelItem channel={channel} index={index} />
-                      </div>
+                      <ContextMenu key={channel.id}>
+                        <ContextMenuTrigger asChild>
+                          <div>
+                            <ChannelItem channel={channel} index={index} />
+                          </div>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent className="w-52">
+                          <ContextMenuItem onClick={() => handleMarkRead(channel)}>
+                            {channel.state.unreadCount ? "Mark as Read" : "Mark as Unread"}
+                          </ContextMenuItem>
+                          <ContextMenuItem onClick={() => handleToggleMute(channel)}>
+                            {mutedChannelIds.has(channel.id!) ? "Unmute Notifications" : "Mute Notifications"}
+                          </ContextMenuItem>
+                          <ContextMenuItem onClick={() => handleTogglePin(channel)}>
+                            {pinnedChannelIds.has(channel.id!) ? "Unpin from Top" : "Pin to Top"}
+                          </ContextMenuItem>
+                          <ContextMenuItem onClick={() => handleCopyLink(channel)}>
+                            Copy Link
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => handleLeaveGroup(channel)}
+                          >
+                            Leave Group
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
                     ))}
                   </div>
                 </div>

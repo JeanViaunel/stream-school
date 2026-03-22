@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Popover,
   PopoverContent,
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChatContext } from "stream-chat-react";
+import { toast } from "sonner";
 import {
   LogOut,
   Settings,
@@ -43,8 +45,21 @@ function initials(name: string): string {
 
 export function UserMenu({ onLogout }: UserMenuProps) {
   const { session } = useAuth();
+  const { client } = useChatContext();
   const [status, setStatus] = useState<UserStatus>("online");
+  const [syncingStatus, setSyncingStatus] = useState(false);
   const [open, setOpen] = useState(false);
+
+  // Initialise from Stream user data on mount
+  useEffect(() => {
+    const streamStatus = client.user?.status;
+    if (typeof streamStatus === "string") {
+      const match = (Object.keys(statusConfig) as UserStatus[]).find(
+        (key) => statusConfig[key].label === streamStatus
+      );
+      setStatus(match ?? "online");
+    }
+  }, [client.user?.status]);
 
   const currentStatus = statusConfig[status];
   const StatusIcon = currentStatus.icon;
@@ -113,7 +128,23 @@ export function UserMenu({ onLogout }: UserMenuProps) {
             return (
               <button
                 key={s}
-                onClick={() => setStatus(s)}
+                disabled={syncingStatus}
+              onClick={async () => {
+                if (syncingStatus) return;
+                setStatus(s);
+                setSyncingStatus(true);
+                try {
+                  await client.partialUpdateUser({
+                    id: session!.streamUserId,
+                    set: { status: statusConfig[s].label },
+                  });
+                } catch {
+                  setStatus(status);
+                  toast.error("Failed to update status");
+                } finally {
+                  setSyncingStatus(false);
+                }
+              }}
                 className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
                   status === s 
                     ? "bg-primary/10 text-primary" 
