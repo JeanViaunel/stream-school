@@ -102,9 +102,7 @@ export function CallButton() {
                 "disabled:cursor-not-allowed disabled:opacity-40",
                 isInCall
                   ? "text-emerald-400 hover:bg-emerald-400/10"
-                  : hasActiveCall
-                    ? "text-amber-400 hover:bg-amber-400/10"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
               )}
             />
           }

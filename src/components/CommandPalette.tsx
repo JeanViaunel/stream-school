@@ -114,7 +114,7 @@ export function CommandPalette() {
       shortcut: "⌘,",
       action: () => {
         setOpen(false)
-        toast.info("Settings coming soon")
+        router.push("/settings")
       },
     },
     {

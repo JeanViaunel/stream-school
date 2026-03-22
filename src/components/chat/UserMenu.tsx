@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Popover,
   PopoverContent,
@@ -46,6 +47,7 @@ function initials(name: string): string {
 export function UserMenu({ onLogout }: UserMenuProps) {
   const { session } = useAuth();
   const { client } = useChatContext();
+  const router = useRouter();
   const [status, setStatus] = useState<UserStatus>("online");
   const [syncingStatus, setSyncingStatus] = useState(false);
   const [open, setOpen] = useState(false);
@@ -165,15 +167,24 @@ export function UserMenu({ onLogout }: UserMenuProps) {
 
         {/* Menu Items */}
         <div className="p-2 space-y-0.5">
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-muted transition-colors">
+          <button
+            onClick={() => { setOpen(false); router.push("/profile"); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-muted transition-colors"
+          >
             <User className="h-4 w-4 text-muted-foreground" />
             <span>Profile</span>
           </button>
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-muted transition-colors">
+          <button
+            onClick={() => { setOpen(false); router.push("/settings"); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-muted transition-colors"
+          >
             <Settings className="h-4 w-4 text-muted-foreground" />
             <span>Settings</span>
           </button>
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-muted transition-colors">
+          <button
+            onClick={() => { setOpen(false); router.push("/keyboard-shortcuts"); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-muted transition-colors"
+          >
             <Keyboard className="h-4 w-4 text-muted-foreground" />
             <span>Keyboard Shortcuts</span>
             <kbd className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
