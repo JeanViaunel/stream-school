@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   StreamCall,
   StreamTheme,
@@ -17,29 +17,18 @@ import { NetworkIndicator, NetworkBanner } from "./NetworkIndicator";
 import { ParticipantList } from "./ParticipantList";
 import { SelfView } from "./SelfView";
 import { CallEnded } from "./CallEnded";
-import { CallLobby } from "./CallLobby";
 import { type CallLayout } from "./LayoutSwitcher";
 
-function CallTimer({ callingState }: { callingState: CallingState }) {
+function CallTimer() {
   const [elapsed, setElapsed] = useState(0);
-  const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (callingState === CallingState.JOINED) {
-      if (!startTimeRef.current) {
-        startTimeRef.current = Date.now();
-      }
-      const interval = setInterval(() => {
-        if (startTimeRef.current) {
-          setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
-        }
-      }, 1000);
-      return () => clearInterval(interval);
-    } else {
-      setElapsed(0);
-      startTimeRef.current = null;
-    }
-  }, [callingState]);
+    const start = Date.now();
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const hours = Math.floor(elapsed / 3600);
   const mins = Math.floor((elapsed % 3600) / 60);
@@ -208,7 +197,7 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
           </div>
 
           {/* Center: Timer */}
-          <CallTimer callingState={callingState} />
+          <CallTimer />
 
           {/* Right: Stats */}
           <div className="flex items-center gap-3">

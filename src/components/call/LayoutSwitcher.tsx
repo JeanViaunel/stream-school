@@ -41,17 +41,19 @@ export function LayoutSwitcher({
     <TooltipProvider>
       <DropdownMenu>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger
-              className={cn(
-                "group relative flex h-12 w-12 items-center justify-center rounded-2xl",
-                "transition-all duration-150 focus-visible:outline-none",
-                "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white",
-                "border border-white/5 hover:border-white/15"
-              )}
-            >
-              <Icon className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
-            </DropdownMenuTrigger>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                className={cn(
+                  "group relative flex h-12 w-12 items-center justify-center rounded-2xl",
+                  "transition-all duration-150 focus-visible:outline-none",
+                  "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white",
+                  "border border-white/5 hover:border-white/15"
+                )}
+              />
+            }
+          >
+            <Icon className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
           </TooltipTrigger>
           <TooltipContent side="top">
             <p>Change layout</p>
