@@ -551,6 +551,37 @@ export function ClassCallRoom({
     onLeave();
   }, [myLobbyRequest, isTeacher, onLeave]);
 
+  // Student: auto-join when admitted
+  useEffect(() => {
+    if (
+      !call ||
+      isTeacher ||
+      !myLobbyRequest ||
+      myLobbyRequest.status !== "admitted" ||
+      !isInLobby
+    )
+      return;
+    if (studentJoinedAfterAdmitRef.current) return;
+
+    const autoJoin = async () => {
+      studentJoinedAfterAdmitRef.current = true;
+      setIsEnteringClassroom(true);
+      try {
+        await prepareMediaForJoin(call);
+        await call.join();
+        setIsInLobby(false);
+      } catch (err) {
+        studentJoinedAfterAdmitRef.current = false;
+        toast.error("Failed to enter the classroom");
+        console.error(err);
+      } finally {
+        setIsEnteringClassroom(false);
+      }
+    };
+
+    void autoJoin();
+  }, [call, isTeacher, myLobbyRequest, isInLobby, prepareMediaForJoin]);
+
   // Student: listen for admission signal from the teacher
   useEffect(() => {
     if (!call || isTeacher) return;
