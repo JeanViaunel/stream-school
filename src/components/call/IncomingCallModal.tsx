@@ -1,19 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   useCalls,
   CallingState,
   StreamCall,
   useCallStateHooks,
-  type Call,
+  type Call
 } from "@stream-io/video-react-sdk";
-import { Phone, PhoneOff, Video, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Phone, PhoneOff, Video } from "lucide-react";
+// import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
 import { startRingtone } from "@/lib/settings";
 import { useAuth } from "@/contexts/AuthContext";
+import Image from "next/image";
 
 function IncomingCallPanel({ call }: { call: Call }) {
   const router = useRouter();
@@ -22,6 +23,10 @@ function IncomingCallPanel({ call }: { call: Call }) {
   const [countdown, setCountdown] = useState(30);
   const { settings } = useSettings();
   const stopRingtoneRef = useRef<(() => void) | null>(null);
+  const decline = useCallback(async () => {
+    const reason = call.isCreatedByMe ? "cancel" : "decline";
+    await call.leave({ reject: true, reason });
+  }, [call]);
 
   // Start / stop ringtone based on callSounds setting and ringing state
   useEffect(() => {
@@ -32,17 +37,16 @@ function IncomingCallPanel({ call }: { call: Call }) {
       stopRingtoneRef.current?.();
       stopRingtoneRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.callSounds, callingState]);
 
   useEffect(() => {
     if (countdown <= 0) {
-      decline();
+      void decline();
       return;
     }
     const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
     return () => clearTimeout(timer);
-  }, [countdown]);
+  }, [countdown, decline]);
 
   if (callingState !== CallingState.RINGING) return null;
 
@@ -55,17 +59,15 @@ function IncomingCallPanel({ call }: { call: Call }) {
     router.push(`/call/${call.id}`);
   }
 
-  async function decline() {
-    const reason = call.isCreatedByMe ? "cancel" : "decline";
-    await call.leave({ reject: true, reason });
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-2xl">
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+        <div
+          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "1s" }}
+        />
       </div>
 
       {/* Main content */}
@@ -76,20 +78,31 @@ function IncomingCallPanel({ call }: { call: Call }) {
             {/* Multiple animated rings */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="absolute h-40 w-40 rounded-full border-2 border-purple-500/20 animate-ring-pulse" />
-              <div className="absolute h-48 w-48 rounded-full border border-purple-500/10 animate-ring-pulse" style={{ animationDelay: "0.3s" }} />
-              <div className="absolute h-56 w-56 rounded-full border border-purple-500/5 animate-ring-pulse" style={{ animationDelay: "0.6s" }} />
+              <div
+                className="absolute h-48 w-48 rounded-full border border-purple-500/10 animate-ring-pulse"
+                style={{ animationDelay: "0.3s" }}
+              />
+              <div
+                className="absolute h-56 w-56 rounded-full border border-purple-500/5 animate-ring-pulse"
+                style={{ animationDelay: "0.6s" }}
+              />
             </div>
-            
+
             {/* Avatar */}
-            <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-purple-500/30 to-indigo-500/30 border-2 border-purple-500/40 shadow-2xl shadow-purple-500/20">
+            <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-linear-to-br from-purple-500/30 to-indigo-500/30 border-2 border-purple-500/40 shadow-2xl shadow-purple-500/20">
               {caller?.image ? (
-                <img
-                  src={caller.image}
+                <Image
+                  src={caller.image ?? ""}
                   alt={callerName}
                   className="h-full w-full rounded-full object-cover"
+                  width={128}
+                  height={128}
                 />
               ) : (
-                <span className="text-3xl font-bold text-white" style={{ fontFamily: "var(--font-syne)" }}>
+                <span
+                  className="text-3xl font-bold text-white"
+                  style={{ fontFamily: "var(--font-syne)" }}
+                >
                   {callerInitials}
                 </span>
               )}
@@ -107,7 +120,7 @@ function IncomingCallPanel({ call }: { call: Call }) {
           <p className="text-sm uppercase tracking-[0.2em] text-purple-400 font-medium mb-2">
             Incoming Video Call
           </p>
-          <h2 
+          <h2
             className="text-3xl font-bold text-white mb-2"
             style={{ fontFamily: "var(--font-syne)" }}
           >
@@ -142,7 +155,9 @@ function IncomingCallPanel({ call }: { call: Call }) {
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-lg font-mono font-semibold text-white">{countdown}</span>
+              <span className="text-lg font-mono font-semibold text-white">
+                {countdown}
+              </span>
             </div>
           </div>
         </div>
@@ -153,7 +168,7 @@ function IncomingCallPanel({ call }: { call: Call }) {
           <div className="flex flex-col items-center gap-3">
             <button
               onClick={decline}
-              className="group relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30 transition-all duration-200 hover:scale-110 hover:shadow-red-500/50"
+              className="group relative flex h-16 w-16 items-center justify-center rounded-full bg-linear-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30 transition-all duration-200 hover:scale-110 hover:shadow-red-500/50"
             >
               <PhoneOff className="h-7 w-7 text-white transition-transform duration-200 group-hover:rotate-12" />
             </button>
@@ -164,11 +179,13 @@ function IncomingCallPanel({ call }: { call: Call }) {
           <div className="flex flex-col items-center gap-3">
             <button
               onClick={accept}
-              className="group relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/40 transition-all duration-200 hover:scale-110 hover:shadow-emerald-500/60"
+              className="group relative flex h-20 w-20 items-center justify-center rounded-full bg-linear-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/40 transition-all duration-200 hover:scale-110 hover:shadow-emerald-500/60"
             >
               <Phone className="h-8 w-8 text-white transition-transform duration-200 group-hover:rotate-12" />
             </button>
-            <span className="text-sm font-semibold text-emerald-400">Accept</span>
+            <span className="text-sm font-semibold text-emerald-400">
+              Accept
+            </span>
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 import { Clock, Users, Phone, RotateCcw, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -41,7 +41,7 @@ export function CallEnded({
   recordingAvailable,
   canRejoin = true,
   onRejoin,
-  onClose,
+  onClose
 }: CallEndedProps) {
   const [countdown, setCountdown] = useState(10);
   const [rating, setRating] = useState(0);
@@ -59,26 +59,31 @@ export function CallEnded({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-2xl">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+        <div
+          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "1s" }}
+        />
       </div>
 
       <div className="relative z-10 w-full max-w-md mx-4 animate-scale-in">
         <div className="flex justify-center mb-6">
           <div className="relative">
             <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-xl animate-pulse" />
-            <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/30">
+            <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-linear-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/30">
               <Phone className="h-8 w-8 text-white" />
             </div>
           </div>
         </div>
 
-        <h2 
+        <h2
           className="text-3xl font-bold text-center text-white mb-2"
           style={{ fontFamily: "var(--font-syne)" }}
         >
           Call Ended
         </h2>
-        <p className="text-center text-white/50 mb-8">Thanks for using Stream School</p>
+        <p className="text-center text-white/50 mb-8">
+          Thanks for using Stream School
+        </p>
 
         <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 mb-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -111,11 +116,15 @@ export function CallEnded({
               <p className="text-xs text-white/40 mb-2">Data Usage</p>
               <div className="flex justify-between text-sm">
                 <span className="text-white/60">Sent</span>
-                <span className="font-mono text-white">{formatBytes(dataUsage.sent)}</span>
+                <span className="font-mono text-white">
+                  {formatBytes(dataUsage.sent)}
+                </span>
               </div>
               <div className="flex justify-between text-sm mt-1">
                 <span className="text-white/60">Received</span>
-                <span className="font-mono text-white">{formatBytes(dataUsage.received)}</span>
+                <span className="font-mono text-white">
+                  {formatBytes(dataUsage.received)}
+                </span>
               </div>
             </div>
           )}
@@ -123,13 +132,17 @@ export function CallEnded({
           {recordingAvailable && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
               <div className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="text-sm text-amber-200">Recording available in your library</span>
+              <span className="text-sm text-amber-200">
+                Recording available in your library
+              </span>
             </div>
           )}
         </div>
 
         <div className="mb-6">
-          <p className="text-center text-sm text-white/50 mb-3">How was your call quality?</p>
+          <p className="text-center text-sm text-white/50 mb-3">
+            How was your call quality?
+          </p>
           <div className="flex justify-center gap-2">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
@@ -165,7 +178,7 @@ export function CallEnded({
           {canRejoin && (
             <Button
               onClick={onRejoin}
-              className="flex-1 h-12 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+              className="flex-1 h-12 bg-linear-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
             >
               <RotateCcw className="h-4 w-4 mr-2" />
               Rejoin
