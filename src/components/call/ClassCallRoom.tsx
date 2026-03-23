@@ -5,11 +5,13 @@ import {
   StreamCall,
   StreamTheme,
   SpeakerLayout,
+  PaginatedGridLayout,
   useStreamVideoClient,
   useCall,
   useCallStateHooks,
   Call,
   CallingState,
+  BackgroundFiltersProvider,
 } from "@stream-io/video-react-sdk";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
@@ -18,16 +20,14 @@ import { Button } from "@/components/ui/button";
 import { Lobby } from "./Lobby";
 import { LobbyAdmitter } from "./LobbyAdmitter";
 import { CallEnded } from "./CallEnded";
-import { FloatingControls } from "./FloatingControls";
+import { FloatingControls, CallLayout } from "./FloatingControls";
 import { PermissionRequests } from "./PermissionRequests";
 import { RequestPermissionButton } from "./RequestPermissionButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGradeSkin } from "@/contexts/GradeSkinContext";
 import { toast } from "sonner";
 import { Loader2, MicOff } from "lucide-react";
-import { TranscriptionToggle } from "./TranscriptionToggle";
 import { ClosedCaptions } from "./ClosedCaptions";
-import { ToggleClosedCaptions } from "./ToggleClosedCaptions";
 import { ScreenShareAnnotation } from "./ScreenShareAnnotation";
 
 interface PendingUser {
@@ -70,6 +70,9 @@ function ClassCallRoomInner({
   const call = useCall();
   const { gradeBand } = useGradeSkin();
   const isPrimaryBand = gradeBand === "primary";
+  
+  // Layout state - managed here and passed to controls
+  const [currentLayout, setCurrentLayout] = useState<CallLayout>("spotlight");
 
   const [showEnded, setShowEnded] = useState(false);
   const [showRinging, setShowRinging] = useState(false);
@@ -182,6 +185,19 @@ function ClassCallRoomInner({
     );
   }
 
+  // Render the appropriate layout based on current selection
+  const renderLayout = () => {
+    switch (currentLayout) {
+      case "grid":
+        return <PaginatedGridLayout key="grid-layout" />;
+      case "sidebar":
+        return <SpeakerLayout key="sidebar-layout" participantsBarPosition="left" />;
+      case "spotlight":
+      default:
+        return <SpeakerLayout key="spotlight-layout" />;
+    }
+  };
+
   return (
     <div className="relative h-full bg-slate-950">
       <StreamTheme className="relative w-full h-full bg-transparent">
@@ -189,7 +205,7 @@ function ClassCallRoomInner({
           ref={screenShareContainerRef}
           className="absolute inset-0 flex items-center justify-center pb-24"
         >
-          <SpeakerLayout />
+          {renderLayout()}
           
           {/* Screen Share Annotation Overlay */}
           {isScreenSharing && activeSessionId && (
@@ -216,9 +232,6 @@ function ClassCallRoomInner({
           </Button>
         </div>
       )}
-
-      {/* Transcription controls for teacher */}
-      <TranscriptionToggle isTeacher={isTeacher} />
 
       {/* Closed captions overlay for all users */}
       <ClosedCaptions />
@@ -247,12 +260,9 @@ function ClassCallRoomInner({
       <FloatingControls
         onLeave={onLeave}
         onEndForAll={onEndForAll}
-        onToggleParticipants={() => {}}
-        onToggleChat={() => {}}
-        currentLayout="spotlight"
-        onLayoutChange={() => {}}
-        isParticipantsOpen={false}
-        isChatOpen={false}
+        currentLayout={currentLayout}
+        onLayoutChange={setCurrentLayout}
+        isTeacher={isTeacher}
       />
     </div>
   );
@@ -326,7 +336,9 @@ export function ClassCallRoom({
             });
           }
         } else {
+          // For students: disable camera initially but allow them to enable later
           await callInstance.camera.disable();
+          await callInstance.microphone.disable();
           await callInstance.join();
           setIsInLobby(true);
         }
@@ -504,18 +516,31 @@ export function ClassCallRoom({
 
   return (
     <StreamCall call={call}>
-      <ClassCallRoomInner
-        isTeacher={isTeacher}
-        className={className}
-        teacherName={teacherName}
-        pendingUsers={pendingUsers}
-        onAdmit={handleAdmit}
-        onDeny={handleDeny}
-        onMuteAll={handleMuteAll}
-        onLeave={onLeave}
-        onEndForAll={handleEndForAll}
-        activeSessionId={activeSession?._id}
-      />
+      <BackgroundFiltersProvider
+        backgroundImages={[
+          "/backgrounds/classroom.svg",
+          "/backgrounds/office.svg",
+          "/backgrounds/library.svg",
+          "/backgrounds/nature.svg",
+          "/backgrounds/space.svg",
+        ]}
+        onError={(error) => {
+          console.error("Background filter error:", error);
+        }}
+      >
+        <ClassCallRoomInner
+          isTeacher={isTeacher}
+          className={className}
+          teacherName={teacherName}
+          pendingUsers={pendingUsers}
+          onAdmit={handleAdmit}
+          onDeny={handleDeny}
+          onMuteAll={handleMuteAll}
+          onLeave={onLeave}
+          onEndForAll={handleEndForAll}
+          activeSessionId={activeSession?._id}
+        />
+      </BackgroundFiltersProvider>
     </StreamCall>
   );
 }

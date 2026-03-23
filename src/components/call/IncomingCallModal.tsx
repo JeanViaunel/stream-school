@@ -12,7 +12,7 @@ import {
   AcceptCallButton,
   CancelCallButton,
   type Call,
-  type UserResponse,
+  type UserResponse
 } from "@stream-io/video-react-sdk";
 import { PhoneOff } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -31,7 +31,7 @@ const CALLING_STATE_TO_LABEL: Partial<Record<CallingState, string>> = {
   [CallingState.IDLE]: "",
   [CallingState.UNKNOWN]: "",
   [CallingState.JOINED]: "Joined",
-  [CallingState.LEFT]: "Left call",
+  [CallingState.LEFT]: "Left call"
 };
 
 const CallCallingStateLabel = () => {
@@ -52,9 +52,9 @@ const CallCallingStateLabel = () => {
 const RingingCallToggleAudio = () => {
   const { useMicrophoneState } = useCallStateHooks();
   const { microphone, isMute } = useMicrophoneState();
-  
+
   return (
-    <button 
+    <button
       onClick={() => microphone.toggle()}
       className={cn(
         "flex h-12 w-12 items-center justify-center rounded-full transition-colors border",
@@ -64,13 +64,38 @@ const RingingCallToggleAudio = () => {
       )}
     >
       {isMute ? (
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+        <svg
+          className="h-5 w-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"
+          />
         </svg>
       ) : (
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+        <svg
+          className="h-5 w-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+          />
         </svg>
       )}
     </button>
@@ -80,9 +105,9 @@ const RingingCallToggleAudio = () => {
 const RingingCallToggleVideo = () => {
   const { useCameraState } = useCallStateHooks();
   const { camera, isMute } = useCameraState();
-  
+
   return (
-    <button 
+    <button
       onClick={() => camera.toggle()}
       className={cn(
         "flex h-12 w-12 items-center justify-center rounded-full transition-colors border",
@@ -92,13 +117,38 @@ const RingingCallToggleVideo = () => {
       )}
     >
       {isMute ? (
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+        <svg
+          className="h-5 w-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"
+          />
         </svg>
       ) : (
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        <svg
+          className="h-5 w-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
         </svg>
       )}
     </button>
@@ -106,7 +156,13 @@ const RingingCallToggleVideo = () => {
 };
 
 // Component to display call members (caller for incoming, called users for outgoing)
-const CallMembers = ({ members, isOutgoing }: { members: UserResponse[]; isOutgoing: boolean }) => {
+const CallMembers = ({
+  members,
+  isOutgoing
+}: {
+  members: UserResponse[];
+  isOutgoing: boolean;
+}) => {
   if (members.length === 0) return null;
 
   return (
@@ -114,7 +170,7 @@ const CallMembers = ({ members, isOutgoing }: { members: UserResponse[]; isOutgo
       <div className="flex -space-x-4">
         {members.slice(0, 3).map((member) => (
           <div key={member.id} className="relative">
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-purple-500/30 to-indigo-500/30 border-2 border-purple-500/40 shadow-2xl shadow-purple-500/20 overflow-hidden">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-linear-to-br from-purple-500/30 to-indigo-500/30 border-2 border-purple-500/40 shadow-2xl shadow-purple-500/20 overflow-hidden">
               {member.image ? (
                 <Image
                   src={member.image}
@@ -124,8 +180,8 @@ const CallMembers = ({ members, isOutgoing }: { members: UserResponse[]; isOutgo
                   height={96}
                 />
               ) : (
-                <Avatar 
-                  name={member.name || member.id} 
+                <Avatar
+                  name={member.name || member.id}
                   imageSrc={member.image}
                   style={{ width: 96, height: 96 }}
                 />
@@ -139,10 +195,9 @@ const CallMembers = ({ members, isOutgoing }: { members: UserResponse[]; isOutgo
           className="text-2xl font-bold text-white mb-1"
           style={{ fontFamily: "var(--font-syne)" }}
         >
-          {members.length === 1 
-            ? (members[0]?.name || members[0]?.id || "Unknown")
-            : `${members.length} people`
-          }
+          {members.length === 1
+            ? members[0]?.name || members[0]?.id || "Unknown"
+            : `${members.length} people`}
         </h2>
         <p className="text-white/50">
           {isOutgoing ? "Calling..." : "is calling you"}
@@ -155,7 +210,12 @@ const CallMembers = ({ members, isOutgoing }: { members: UserResponse[]; isOutgo
 // Custom Ringing Call Panel using Stream SDK components
 function RingingCallPanel({ call }: { call: Call }) {
   const router = useRouter();
-  const { useCallCallingState, useCallMembers, useCallCreatedBy, useCameraState } = useCallStateHooks();
+  const {
+    useCallCallingState,
+    useCallMembers,
+    useCallCreatedBy,
+    useCameraState
+  } = useCallStateHooks();
   const callingState = useCallCallingState();
   const members = useCallMembers();
   const creator = useCallCreatedBy();
@@ -179,7 +239,11 @@ function RingingCallPanel({ call }: { call: Call }) {
 
   // Start / stop ringtone based on callSounds setting and ringing state
   useEffect(() => {
-    if (settings.callSounds && callingState === CallingState.RINGING && !isOutgoing) {
+    if (
+      settings.callSounds &&
+      callingState === CallingState.RINGING &&
+      !isOutgoing
+    ) {
       stopRingtoneRef.current = startRingtone();
     }
     return () => {
@@ -199,7 +263,10 @@ function RingingCallPanel({ call }: { call: Call }) {
     return () => clearTimeout(timer);
   }, [countdown, callingState, handleDecline]);
 
-  if (callingState !== CallingState.RINGING && callingState !== CallingState.JOINING) {
+  if (
+    callingState !== CallingState.RINGING &&
+    callingState !== CallingState.JOINING
+  ) {
     return null;
   }
 
@@ -207,10 +274,11 @@ function RingingCallPanel({ call }: { call: Call }) {
   let membersToShow: UserResponse[] = [];
   if (isOutgoing) {
     // Show called users for outgoing call
-    membersToShow = members
-      ?.slice(0, 3)
-      .map(({ user }) => user)
-      .filter((u): u is UserResponse => !!u) || [];
+    membersToShow =
+      members
+        ?.slice(0, 3)
+        .map(({ user }) => user)
+        .filter((u): u is UserResponse => !!u) || [];
   } else if (creator) {
     // Show caller for incoming call
     membersToShow = [creator];
@@ -242,14 +310,17 @@ function RingingCallPanel({ call }: { call: Call }) {
             <div className="relative">
               {/* Video Preview */}
               <div className="relative w-64 h-48 rounded-2xl overflow-hidden border border-white/10 bg-black/40">
-                <VideoPreview 
+                <VideoPreview
                   mirror={true}
                   DisabledVideoPreview={() => (
-                    <CallMembers members={membersToShow} isOutgoing={isOutgoing} />
+                    <CallMembers
+                      members={membersToShow}
+                      isOutgoing={isOutgoing}
+                    />
                   )}
                 />
               </div>
-              
+
               {/* Calling label overlay */}
               <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
                 <CallCallingStateLabel />
@@ -318,10 +389,7 @@ function RingingCallPanel({ call }: { call: Call }) {
           {/* Accept/Decline buttons */}
           {isOutgoing ? (
             /* Outgoing call - Cancel button only */
-            <CancelCallButton
-              onClick={handleDecline}
-              disabled={isJoining}
-            />
+            <CancelCallButton onClick={handleDecline} disabled={isJoining} />
           ) : (
             /* Incoming call - Accept and Decline buttons */
             <div className="flex items-center gap-6">
@@ -334,19 +402,18 @@ function RingingCallPanel({ call }: { call: Call }) {
                     "group relative flex h-16 w-16 items-center justify-center rounded-full transition-all duration-200",
                     isJoining
                       ? "bg-gray-500/50 cursor-not-allowed"
-                      : "bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30 hover:scale-110 hover:shadow-red-500/50"
+                      : "bg-linear-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30 hover:scale-110 hover:shadow-red-500/50"
                   )}
                 >
                   <PhoneOff className="h-7 w-7 text-white transition-transform duration-200 group-hover:rotate-12" />
                 </button>
-                <span className="text-xs font-medium text-white/60">Decline</span>
+                <span className="text-xs font-medium text-white/60">
+                  Decline
+                </span>
               </div>
 
               {/* Accept */}
-              <AcceptCallButton
-                onClick={handleAccept}
-                disabled={isJoining}
-              />
+              <AcceptCallButton onClick={handleAccept} disabled={isJoining} />
             </div>
           )}
         </div>

@@ -9,7 +9,8 @@ import {
   useCallStateHooks,
   useCall,
   type Call,
-  CallingState
+  CallingState,
+  BackgroundFiltersProvider,
 } from "@stream-io/video-react-sdk";
 import { toast } from "sonner";
 import { Users, Clock, Hash } from "lucide-react";
@@ -356,7 +357,20 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
 export function CallRoom({ call, onLeave }: CallRoomProps) {
   return (
     <StreamCall call={call}>
-      <CallRoomInner onLeave={onLeave} />
+      <BackgroundFiltersProvider
+        backgroundImages={[
+          "/backgrounds/classroom.svg",
+          "/backgrounds/office.svg",
+          "/backgrounds/library.svg",
+          "/backgrounds/nature.svg",
+          "/backgrounds/space.svg",
+        ]}
+        onError={(error) => {
+          console.error("Background filter error:", error);
+        }}
+      >
+        <CallRoomInner onLeave={onLeave} />
+      </BackgroundFiltersProvider>
     </StreamCall>
   );
 }

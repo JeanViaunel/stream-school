@@ -16,7 +16,7 @@ import {
 import { Sparkles, Loader2, Wand2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SessionSummary } from "./SessionSummary";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface AISummaryButtonProps {
   sessionId: Id<"sessions">;
@@ -39,14 +39,12 @@ export function AISummaryButton({
   className,
   onSummaryGenerated,
 }: AISummaryButtonProps) {
-  const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [summary, setSummary] = useState(existingSummary);
   const [keyPoints, setKeyPoints] = useState(existingKeyPoints);
   const [lastGenerated, setLastGenerated] = useState(generatedAt);
 
-  const generateSummary = useAction(api.ai.generateSessionSummary);
   const summarizeChat = useAction(api.ai.summarizeChat);
 
   const handleGenerate = useCallback(async () => {
@@ -64,28 +62,25 @@ export function AISummaryButton({
         onSummaryGenerated(result.summary, result.keyPoints);
       }
       
-      toast({
-        title: "Summary Generated",
+      toast.success("Summary Generated", {
         description: "Session summary has been created successfully",
       });
     } catch (err) {
       console.error("Failed to generate summary:", err);
-      toast({
-        title: "Generation Failed",
+      toast.error("Generation Failed", {
         description: err instanceof Error ? err.message : "Failed to generate summary",
-        variant: "destructive",
       });
     } finally {
       setIsGenerating(false);
     }
-  }, [sessionId, summarizeChat, onSummaryGenerated, toast]);
+  }, [sessionId, summarizeChat, onSummaryGenerated]);
 
   const hasSummary = !!summary;
 
   if (hasSummary) {
     return (
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogTrigger asChild>
+        <DialogTrigger>
           <Button variant={variant} size={size} className={cn("gap-2", className)}>
             <FileText className="h-4 w-4" />
             View Summary

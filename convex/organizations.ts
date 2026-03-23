@@ -1,4 +1,4 @@
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
 
 export const createOrganization = internalMutation({
@@ -90,5 +90,27 @@ export const getById = query({
   ),
   handler: async (ctx, args) => {
     return await ctx.db.get(args.id);
+  },
+});
+
+export const getAllOrganizations = internalQuery({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id("organizations"),
+      _creationTime: v.number(),
+      name: v.string(),
+      slug: v.string(),
+      settings: v.object({
+        studentDmsEnabled: v.boolean(),
+        recordingEnabled: v.boolean(),
+        lobbyEnabled: v.boolean(),
+        maxClassSize: v.number(),
+        dataRetentionDays: v.number(),
+      }),
+    })
+  ),
+  handler: async (ctx) => {
+    return await ctx.db.query("organizations").collect();
   },
 });

@@ -149,6 +149,15 @@ export const createUser = internalMutation({
     organizationId: v.optional(v.id("organizations")),
     gradeLevel: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
+    // COPPA compliance fields
+    birthDate: v.optional(v.string()),
+    parentEmail: v.optional(v.string()),
+    parentalConsentStatus: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("not_required")
+    )),
+    consentToken: v.optional(v.string()),
   },
   returns: v.id("users"),
   handler: async (ctx, args) => {
@@ -167,6 +176,11 @@ export const createUser = internalMutation({
       organizationId: args.organizationId,
       gradeLevel: args.gradeLevel,
       isActive: args.isActive,
+      // COPPA fields
+      birthDate: args.birthDate,
+      parentEmail: args.parentEmail,
+      parentalConsentStatus: args.parentalConsentStatus,
+      consentToken: args.consentToken,
     });
   },
 });

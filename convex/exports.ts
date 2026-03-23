@@ -447,3 +447,26 @@ export const getUserEnrollments = internalQuery({
       .collect();
   },
 });
+
+// Cleanup expired exports (runs daily via cron)
+export const cleanupExpiredExports = internalMutation({
+  args: {},
+  returns: v.object({
+    deletedCount: v.number(),
+  }),
+  handler: async (ctx) => {
+    const now = Date.now();
+    const expiredExports = await ctx.db
+      .query("dataExports")
+      .filter((q) => q.lt(q.field("expiresAt"), now))
+      .collect();
+
+    let deletedCount = 0;
+    for (const export_ of expiredExports) {
+      await ctx.db.delete(export_._id);
+      deletedCount++;
+    }
+
+    return { deletedCount };
+  },
+});

@@ -42,18 +42,16 @@ export function SessionSummary({
   isTeacher = false,
   onGenerate,
 }: SessionSummaryProps) {
-  const { toast } = useToast();
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleShare = useCallback(() => {
     if (summary) {
       navigator.clipboard.writeText(summary);
-      toast({
-        title: "Summary copied",
+      toast.success("Summary copied", {
         description: "Session summary copied to clipboard",
       });
     }
-  }, [summary, toast]);
+  }, [summary]);
 
   const handleExport = useCallback(() => {
     if (!summary) return;
@@ -78,11 +76,10 @@ export function SessionSummary({
     a.click();
     URL.revokeObjectURL(url);
 
-    toast({
-      title: "Summary exported",
+    toast.success("Summary exported", {
       description: "Session summary downloaded as Markdown",
     });
-  }, [summary, keyPoints, generatedAt, sessionId, toast]);
+  }, [summary, keyPoints, generatedAt, sessionId]);
 
   const hasSummary = !!summary;
 
