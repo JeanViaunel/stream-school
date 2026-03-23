@@ -102,17 +102,6 @@ export const createClass = action({
       streamUserId: teacher.streamUserId,
     });
 
-    // Server-side enforcement: classroom chat is monitor-only for app admins.
-    // Stream Chat permissions are based on channel roles, so we downgrade admin
-    // users to the `guest` role inside the classroom channel.
-    if (teacher.role === "admin") {
-      await ctx.runAction(internal.stream.setClassroomMemberChannelRole, {
-        channelId: streamChannelId,
-        streamUserId: teacher.streamUserId,
-        channelRole: "guest",
-      });
-    }
-
     const classId: Id<"classes"> = await ctx.runMutation(internal.classes.insertClass, {
       organizationId: user.organizationId,
       teacherId: args.teacherId,
@@ -167,12 +156,8 @@ export const ensureAdminReadOnlyInClassroomChat = action({
       throw new Error("Class not in admin organization");
     }
 
-    await ctx.runAction(internal.stream.setClassroomMemberChannelRole, {
-      channelId: cls.streamChannelId,
-      streamUserId: user.streamUserId,
-      channelRole: "guest",
-    });
-
+    // Read-only enforcement is handled at the UI level in ChannelView.
+    // Stream Chat does not support "guest" as a channel member role.
     return null;
   },
 });
@@ -349,14 +334,6 @@ export const adminAssignTeacherToClass = action({
       streamUserId: nextTeacher.streamUserId,
     });
 
-    // Monitor-only enforcement for app admins in classroom chat.
-    if (nextTeacher.role === "admin") {
-      await ctx.runAction(internal.stream.setClassroomMemberChannelRole, {
-        channelId: cls.streamChannelId,
-        streamUserId: nextTeacher.streamUserId,
-        channelRole: "guest",
-      });
-    }
     await ctx.runAction(internal.stream.removeMemberFromChannel, {
       channelId: cls.streamChannelId,
       streamUserId: previousTeacher.streamUserId,

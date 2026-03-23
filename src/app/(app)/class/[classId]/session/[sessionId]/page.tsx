@@ -94,6 +94,7 @@ export default function SessionPage() {
       {/* Call room */}
       <div className="flex-1">
         <ClassCallRoom
+          classId={classId as Id<"classes">}
           callId={sessionId}
           className={classData.name}
           teacherName={classData.teacher?.displayName ?? "Teacher"}

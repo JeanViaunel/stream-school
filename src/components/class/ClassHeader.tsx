@@ -15,7 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGradeSkin } from "@/contexts/GradeSkinContext";
 import { AdminClassQuickActions } from "@/components/class/AdminClassQuickActions";
 import type { Id } from "@/../convex/_generated/dataModel";
-import { Play, LayoutList, Users, MoreVertical, Archive } from "lucide-react";
+import { Play, LayoutList, Users, MoreVertical, Archive, PhoneOff } from "lucide-react";
 
 interface Class {
   _id: string;
@@ -40,6 +40,7 @@ interface ClassHeaderProps {
   onStartSession?: () => void;
   onJoinSession?: () => void;
   onArchiveClass?: () => void;
+  onEndSession?: () => void;
 }
 
 export function ClassHeader({
@@ -50,6 +51,7 @@ export function ClassHeader({
   onStartSession,
   onJoinSession,
   onArchiveClass,
+  onEndSession,
 }: ClassHeaderProps) {
   const router = useRouter();
   const { session } = useAuth();
@@ -75,6 +77,12 @@ export function ClassHeader({
           <LayoutList className="mr-2 h-4 w-4" />
           Class details
         </DropdownMenuItem>
+        {isActiveSession && onEndSession && (
+          <DropdownMenuItem onClick={onEndSession} className="text-destructive">
+            <PhoneOff className="mr-2 h-4 w-4" />
+            End session
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={onArchiveClass} className="text-destructive">
           <Archive className="mr-2 h-4 w-4" />
           Archive Class

@@ -87,17 +87,16 @@ export default function CallPage({ params }: CallPageProps) {
         }
 
         // Record this user as a participant in the call's custom data
-        // so the call card can later show "call ended" vs "missed call"
+        // so the call card can later show "call ended" vs "missed call".
+        // Stream Video merges the custom field server-side, so we only need
+        // to send the fields we're updating (no spread of existing state).
         if (session?.streamUserId) {
           try {
-            const existing =
-              (c.state.custom as Record<string, unknown>) ?? {};
-            const joined =
-              (existing.joinedParticipants as string[] | undefined) ?? [];
+            const custom = c.state.custom as Record<string, unknown> | undefined;
+            const joined = (custom?.joinedParticipants as string[] | undefined) ?? [];
             if (!joined.includes(session.streamUserId)) {
               await c.update({
                 custom: {
-                  ...existing,
                   joinedParticipants: [...joined, session.streamUserId],
                 },
               });

@@ -357,6 +357,23 @@ export const getSessionsByClass = query({
   },
 });
 
+export const getActiveSessionInternal = internalQuery({
+  args: { classId: v.id("classes") },
+  returns: v.union(
+    v.object({ _id: v.id("sessions"), streamCallId: v.string() }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_class_and_started_at", (q) => q.eq("classId", args.classId))
+      .order("desc")
+      .first();
+    if (!session || session.endedAt !== undefined) return null;
+    return { _id: session._id, streamCallId: session.streamCallId };
+  },
+});
+
 export const getSessionForAdmin = internalQuery({
   args: { sessionId: v.id("sessions") },
   returns: v.union(
@@ -429,6 +446,48 @@ export const getActiveSessionForClass = query({
     if (!session || session.endedAt !== undefined) return null;
 
     return { _id: session._id, streamCallId: session.streamCallId };
+  },
+});
+
+export const teacherForceEndSession = action({
+  args: { classId: v.id("classes") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user: { _id: Id<"users">; role?: string } | null = await ctx.runQuery(
+      internal.users.getUserByUsername,
+      { username: usernameFromIdentity(identity) }
+    );
+    if (!user) throw new Error("User not found");
+
+    const cls: { teacherId: Id<"users"> } | null = await ctx.runQuery(
+      internal.classes.getClassByIdInternal,
+      { classId: args.classId }
+    );
+    if (!cls) throw new Error("Class not found");
+
+    const isClassTeacher = cls.teacherId === user._id;
+    const hasTeacherRole =
+      user.role === "teacher" || user.role === "co_teacher" || user.role === "admin";
+
+    if (!isClassTeacher || !hasTeacherRole) {
+      throw new Error("Only the assigned class teacher can end this session");
+    }
+
+    const active: { _id: Id<"sessions">; streamCallId: string } | null =
+      await ctx.runQuery(internal.sessions.getActiveSessionInternal, { classId: args.classId });
+
+    if (!active) throw new Error("No active session found for this class");
+
+    await ctx.runMutation(internal.sessions.markSessionEnded, { sessionId: active._id });
+    await ctx.runAction(internal.stream.endVideoCall, {
+      callType: "default",
+      callId: active.streamCallId,
+    });
+
+    return null;
   },
 });
 

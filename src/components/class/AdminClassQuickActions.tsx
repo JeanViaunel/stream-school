@@ -41,12 +41,12 @@ import {
 import { toast } from "sonner";
 
 type Props = {
-  classId: Id<”classes”>;
-  currentTeacherId: Id<”users”>;
+  classId: Id<"classes">;
+  currentTeacherId: Id<"users">;
   isArchived: boolean;
-  activeSessionId?: Id<”sessions”>;
+  activeSessionId?: Id<"sessions">;
   onArchiveClass?: () => void;
-  /** Hide “Class details” (e.g. when already on the details page). */
+  /** Hide "Class details" (e.g. when already on the details page). */
   hideClassDetailsLink?: boolean;
 };
 

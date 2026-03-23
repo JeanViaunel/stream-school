@@ -73,7 +73,7 @@ const endMeetingValidator = v.union(
   v.object({ ok: v.literal(false), error: v.string() }),
 );
 
-const validateEndMeeting = internalQuery({
+export const validateEndMeeting = internalQuery({
   args: { meetingId: v.id("meetings"), username: v.string() },
   returns: endMeetingValidator,
   handler: async (ctx, { meetingId, username }) => {
@@ -100,7 +100,7 @@ const validateEndMeeting = internalQuery({
   },
 });
 
-const markMeetingEnded = internalMutation({
+export const markMeetingEnded = internalMutation({
   args: { meetingId: v.id("meetings") },
   returns: v.null(),
   handler: async (ctx, { meetingId }) => {

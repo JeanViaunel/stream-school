@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Tooltip,
   TooltipContent,
@@ -100,6 +101,7 @@ function ControlButton({
 
 interface FloatingControlsProps {
   onLeave: () => void;
+  onEndForAll?: () => Promise<void>;
   onToggleParticipants: () => void;
   onToggleChat: () => void;
   currentLayout: CallLayout;
@@ -111,6 +113,7 @@ interface FloatingControlsProps {
 
 export function FloatingControls({
   onLeave,
+  onEndForAll,
   onToggleParticipants,
   onToggleChat,
   currentLayout,
@@ -120,6 +123,7 @@ export function FloatingControls({
   volume = 0,
 }: FloatingControlsProps) {
   const call = useCall();
+  const { session } = useAuth();
   const { useMicrophoneState, useCameraState, useScreenShareState, useLocalParticipant } = useCallStateHooks();
   const { isMute: isMicMuted, microphone } = useMicrophoneState();
   const { isMute: isCameraMuted, camera } = useCameraState();
@@ -127,6 +131,11 @@ export function FloatingControls({
   const localParticipant = useLocalParticipant();
   const isHost = !!call?.state.createdBy?.id &&
     call.state.createdBy.id === localParticipant?.userId;
+  const canEndCall =
+    isHost ||
+    session?.role === "teacher" ||
+    session?.role === "co_teacher" ||
+    session?.role === "admin";
   const [isVisible, setIsVisible] = useState(true);
   const [lastMouseMove, setLastMouseMove] = useState(Date.now());
   const [micVolume, setMicVolume] = useState(0);
@@ -175,8 +184,12 @@ export function FloatingControls({
   async function handleEndForAll() {
     try { await camera.disable(); } catch {}
     try { await microphone.disable(); } catch {}
-    await call?.endCall();
-    onLeave();
+    if (onEndForAll) {
+      await onEndForAll();
+    } else {
+      await call?.endCall();
+      onLeave();
+    }
   }
 
   return (
@@ -332,8 +345,8 @@ export function FloatingControls({
               </div>
             </button>
 
-            {/* End for everyone — only visible to the call creator */}
-            {isHost && (
+            {/* End for everyone — visible to call creator, teachers, and admins */}
+            {canEndCall && (
               <button
                 onClick={() => { setShowLeaveModal(false); handleEndForAll(); }}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-left transition-all duration-150 group"

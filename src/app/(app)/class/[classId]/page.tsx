@@ -26,6 +26,7 @@ export default function ClassPage() {
   const activeSession = useQuery(api.sessions.getActiveSessionForClass, { classId: classId as Id<"classes"> });
   const archiveClass = useMutation(api.classes.archiveClass);
   const ensureAdminReadOnly = useAction(api.classes.ensureAdminReadOnlyInClassroomChat);
+  const teacherForceEndSession = useAction(api.sessions.teacherForceEndSession);
   const [isArchiving, setIsArchiving] = useState(false);
   const [channelReady, setChannelReady] = useState(false);
   const [enforcedReadOnly, setEnforcedReadOnly] = useState(false);
@@ -80,7 +81,18 @@ export default function ClassPage() {
   };
 
   const handleJoinSession = () => {
-    toast.info("Joining session...");
+    if (!activeSession) return;
+    router.push(`/class/${classId}/session/${activeSession.streamCallId}`);
+  };
+
+  const handleEndSession = async () => {
+    if (!confirm("End the active session for everyone?")) return;
+    try {
+      await teacherForceEndSession({ classId: classId as Id<"classes"> });
+      toast.success("Session ended");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to end session");
+    }
   };
 
   const handleArchiveClass = async () => {
@@ -147,6 +159,7 @@ export default function ClassPage() {
           enrollmentCount={classData.enrollmentCount}
           isActiveSession={!!activeSession}
           activeSessionId={activeSession?._id}
+          onEndSession={handleEndSession}
           onStartSession={handleStartSession}
           onJoinSession={handleJoinSession}
           onArchiveClass={handleArchiveClass}

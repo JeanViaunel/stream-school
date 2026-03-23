@@ -1,6 +1,8 @@
 "use client"
 
+import * as React from "react";
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
+import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
@@ -42,19 +44,58 @@ const buttonVariants = cva(
   }
 )
 
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
-  return (
-    <ButtonPrimitive
-      data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  )
-}
+type ButtonProps = ButtonPrimitive.Props &
+  VariantProps<typeof buttonVariants> & {
+    /**
+     * Render the child element directly (Radix Slot pattern),
+     * matching shadcn-style `asChild` behavior.
+     */
+    asChild?: boolean;
+  };
+
+const Button = React.forwardRef<HTMLElement, ButtonProps>(
+  (
+    {
+      className,
+      variant = "default",
+      size = "default",
+      asChild = false,
+      // Base UI props that are not valid DOM attributes for `Slot`.
+      focusableWhenDisabled,
+      nativeButton,
+      render,
+      ...props
+    },
+    ref
+  ) => {
+    const classes = cn(buttonVariants({ variant, size, className }));
+
+    if (asChild) {
+      // Avoid leaking `asChild` (and other Base UI-only props) down to the DOM.
+      return (
+        <Slot
+          data-slot="button"
+          className={classes}
+          ref={ref}
+          {...props}
+        />
+      );
+    }
+
+    return (
+      <ButtonPrimitive
+        data-slot="button"
+        className={classes}
+        ref={ref}
+        focusableWhenDisabled={focusableWhenDisabled}
+        nativeButton={nativeButton}
+        render={render}
+        {...props}
+      />
+    );
+  }
+);
+
+Button.displayName = "Button";
 
 export { Button, buttonVariants }
