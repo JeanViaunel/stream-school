@@ -36,11 +36,62 @@ http.route({
       }
     }
     
-    // Handle recording webhook
+    // Handle recording started webhook
+    // Sent when recording begins server-side (may be triggered by client or auto-on)
+    if (body.type === "call.recording_started") {
+      const { call_cid } = body;
+      
+      console.log(`Recording started for call: ${call_cid}`);
+      
+      // Find the session associated with this call
+      const session = await ctx.runQuery(internal.sessions.getSessionByStreamCallIdInternal, {
+        streamCallId: call_cid,
+      });
+      
+      if (session) {
+        await ctx.runMutation(internal.recordings.markRecordingStartedInternal, {
+          sessionId: session._id,
+        });
+        console.log(`Marked recording started for session: ${session._id}`);
+      } else {
+        console.warn(`No session found for call: ${call_cid}`);
+      }
+      
+      return new Response("Recording start acknowledged", { status: 200 });
+    }
+    
+    // Handle recording stopped webhook
+    // Sent when recording stops server-side
+    if (body.type === "call.recording_stopped") {
+      const { call_cid } = body;
+      
+      console.log(`Recording stopped for call: ${call_cid}`);
+      
+      // Find the session associated with this call
+      const session = await ctx.runQuery(internal.sessions.getSessionByStreamCallIdInternal, {
+        streamCallId: call_cid,
+      });
+      
+      if (session) {
+        await ctx.runMutation(internal.recordings.markRecordingEndedInternal, {
+          sessionId: session._id,
+        });
+        console.log(`Marked recording ended for session: ${session._id}`);
+      } else {
+        console.warn(`No session found for call: ${call_cid}`);
+      }
+      
+      return new Response("Recording stop acknowledged", { status: 200 });
+    }
+    
+    // Handle recording ready webhook
+    // Sent when the recording file is available for download
     if (body.type === "call.recording_ready") {
       const { call_cid, filename, url } = body;
       
-      // Store recording via internal action
+      console.log(`Recording ready for call: ${call_cid}, filename: ${filename}`);
+      
+      // Store recording via internal action (downloads from Stream URL and uploads to S3)
       const storeResult = await ctx.runAction(internal.recordings.storeRecording, {
         recordingUrl: url,
         callId: call_cid,
@@ -53,9 +104,22 @@ http.route({
           callCid: call_cid,
           recordingUrl: storeResult.s3Url ?? url,
         });
+        console.log(`Recording URL updated for call: ${call_cid}`);
+      } else {
+        console.error(`Failed to store recording: ${storeResult.error}`);
       }
       
       return new Response("Recording processed", { status: 200 });
+    }
+    
+    // Handle recording failed webhook
+    // Sent when recording fails for any reason
+    if (body.type === "call.recording_failed") {
+      const { call_cid } = body;
+      
+      console.error(`Recording failed for call: ${call_cid}`);
+      
+      return new Response("Recording failure acknowledged", { status: 200 });
     }
     
     return new Response("OK", { status: 200 });

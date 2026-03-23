@@ -26,13 +26,24 @@ export default defineSchema({
     specializations: v.optional(v.array(v.string())),
     parentConsentGiven: v.optional(v.boolean()),
     parentConsentAt: v.optional(v.number()),
+    // COPPA compliance fields
+    birthDate: v.optional(v.string()),
+    parentEmail: v.optional(v.string()),
+    parentalConsentStatus: v.optional(v.union(
+      v.literal("pending"), 
+      v.literal("approved"), 
+      v.literal("not_required")
+    )),
+    consentToken: v.optional(v.string()),
+    consentVerifiedAt: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
     lastSeenAt: v.optional(v.number()),
     deletionScheduledAt: v.optional(v.number()),
   })
     .index("by_username", ["username"])
     .index("by_organization", ["organizationId"])
-    .index("by_role_and_organization", ["role", "organizationId"]),
+    .index("by_role_and_organization", ["role", "organizationId"])
+    .index("by_consent_token", ["consentToken"]),
 
   organizations: defineTable({
     name: v.string(),
@@ -97,6 +108,23 @@ export default defineSchema({
     recordingConsentRequired: v.boolean(),
     recordingStartedAt: v.optional(v.number()),
     recordingEndedAt: v.optional(v.number()),
+    annotations: v.optional(v.array(v.object({
+      id: v.string(),
+      userId: v.id("users"),
+      type: v.union(v.literal("draw"), v.literal("text"), v.literal("highlight")),
+      data: v.object({
+        x: v.number(),
+        y: v.number(),
+        width: v.optional(v.number()),
+        height: v.optional(v.number()),
+        color: v.string(),
+        strokeWidth: v.optional(v.number()),
+        text: v.optional(v.string()),
+        points: v.optional(v.array(v.object({ x: v.number(), y: v.number() }))),
+      }),
+      timestamp: v.number(),
+      page: v.optional(v.number()),
+    }))),
   })
     .index("by_class", ["classId"])
     .index("by_class_and_started_at", ["classId", "startedAt"])
@@ -409,4 +437,43 @@ export default defineSchema({
     .index("by_organization", ["organizationId"])
     .index("by_class", ["classId"])
     .index("by_imported_by", ["importedBy"]),
+
+  // FERPA compliance - data export tracking
+  dataExports: defineTable({
+    userId: v.id("users"),
+    organizationId: v.id("organizations"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    requestType: v.union(v.literal("gdpr"), v.literal("ferpa")),
+    dataTypes: v.array(v.string()), // ['submissions', 'grades', 'messages', etc.]
+    downloadUrl: v.optional(v.string()),
+    expiresAt: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+    requestedAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_organization", ["organizationId"]),
+
+  // FERPA compliance - data access audit log
+  dataAccessLogs: defineTable({
+    organizationId: v.id("organizations"),
+    actorId: v.id("users"), // who accessed
+    targetId: v.id("users"), // whose data
+    action: v.string(), // 'view', 'export', 'delete', etc.
+    resourceType: v.string(), // 'grade', 'submission', 'message'
+    resourceId: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    accessedAt: v.number(),
+  })
+    .index("by_target", ["targetId"])
+    .index("by_target_and_time", ["targetId", "accessedAt"])
+    .index("by_actor", ["actorId"])
+    .index("by_organization", ["organizationId"]),
 });

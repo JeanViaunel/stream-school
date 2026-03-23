@@ -20,6 +20,7 @@ import { ParticipantList } from "./ParticipantList";
 import { SelfView } from "./SelfView";
 import { CallEnded } from "./CallEnded";
 import { type CallLayout } from "./LayoutSwitcher";
+import { ClosedCaptions } from "./ClosedCaptions";
 
 function CallTimer() {
   const [elapsed, setElapsed] = useState(0);
@@ -80,6 +81,7 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
   const headerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Tracks remote participants across renders so we can detect who left
   const prevRemoteRef = useRef<Map<string, { name?: string; userId: string }>>(new Map());
+  const [showRinging, setShowRinging] = useState(false);
 
   // Show a sonner toast when a remote participant leaves
   useEffect(() => {
@@ -152,6 +154,15 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
     return () => clearInterval(interval);
   }, [callingState]);
 
+  // Handle ringing state for ring calls
+  useEffect(() => {
+    if (callingState === CallingState.RINGING) {
+      setShowRinging(true);
+    } else if (callingState === CallingState.JOINED) {
+      setShowRinging(false);
+    }
+  }, [callingState]);
+
   // Handle call end
   const handleLeave = async () => {
     // Call leave will be handled by the call object
@@ -198,6 +209,53 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
         onRejoin={handleRejoin}
         onClose={handleCloseCallEnded}
       />
+    );
+  }
+
+  // Show ringing/lobby UI while in RINGING state
+  if (showRinging || callingState === CallingState.RINGING || callingState === CallingState.JOINING) {
+    return (
+      <div className="fixed inset-0 bg-slate-950 flex items-center justify-center">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/50 via-slate-950 to-purple-950/30" />
+        
+        <div className="relative z-10 text-center space-y-6">
+          {/* Animated rings */}
+          <div className="relative flex justify-center">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute h-40 w-40 rounded-full border-2 border-purple-500/20 animate-ring-pulse" />
+              <div className="absolute h-48 w-48 rounded-full border border-purple-500/10 animate-ring-pulse" style={{ animationDelay: "0.3s" }} />
+              <div className="absolute h-56 w-56 rounded-full border border-purple-500/5 animate-ring-pulse" style={{ animationDelay: "0.6s" }} />
+            </div>
+            
+            <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-purple-500/30 to-indigo-500/30 border-2 border-purple-500/40 shadow-2xl shadow-purple-500/20">
+              <span className="text-3xl font-bold text-white" style={{ fontFamily: "var(--font-syne)" }}>
+                📞
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "var(--font-syne)" }}>
+              {callingState === CallingState.RINGING ? "Ringing..." : "Joining call..."}
+            </h2>
+            <p className="text-white/50">
+              {callingState === CallingState.RINGING 
+                ? "Waiting for others to answer" 
+                : "Connecting to the call"}
+            </p>
+          </div>
+
+          {/* Cancel button for outgoing ring calls */}
+          {call?.isCreatedByMe && callingState === CallingState.RINGING && (
+            <button
+              onClick={() => call?.leave({ reject: true, reason: "cancel" })}
+              className="px-6 py-3 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+            >
+              Cancel Call
+            </button>
+          )}
+        </div>
+      </div>
     );
   }
 
@@ -271,6 +329,9 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
 
       {/* Self-view (Picture-in-Picture) */}
       <SelfView />
+
+      {/* Closed captions overlay */}
+      <ClosedCaptions />
 
       {/* Participant list panel */}
       <ParticipantList

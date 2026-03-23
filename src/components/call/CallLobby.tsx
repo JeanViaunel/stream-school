@@ -1,27 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState, useEffect } from "react";
 import {
   type Call,
+  VideoPreview,
+  DeviceSettings,
+  DeviceSelectorVideo,
+  DeviceSelectorAudioInput,
+  DeviceSelectorAudioOutput,
+  AudioVolumeIndicator,
+  SpeakerTest,
 } from "@stream-io/video-react-sdk";
-import {
-  Mic,
-  MicOff,
-  Video,
-  VideoOff,
-  Sparkles,
-  LogIn,
-} from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Sparkles, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { VolumeIndicator } from "./VolumeVisualizer";
 import { cn } from "@/lib/utils";
 
 interface CallLobbyProps {
@@ -45,231 +37,18 @@ export function CallLobby({
 }: CallLobbyProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [backgroundBlur, setBackgroundBlur] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState("");
-  const [selectedMicDevice, setSelectedMicDevice] = useState("");
-  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
-  const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
-  const [volume, setVolume] = useState(0);
-  const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const onJoinRef = useRef(onJoin);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const micStreamRef = useRef<MediaStream | null>(null);
-  const animFrameRef = useRef<number | null>(null);
-
-  // Keep ref up to date with the latest callback
-  useEffect(() => {
-    onJoinRef.current = onJoin;
-  }, [onJoin]);
-
-  // Enumerate media devices on mount and on device change
-  useEffect(() => {
-    const enumerateDevices = async () => {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const cameras = devices.filter((d) => d.kind === "videoinput");
-        const mics = devices.filter((d) => d.kind === "audioinput");
-        setCameraDevices(cameras);
-        setMicDevices(mics);
-        setSelectedDevice((prev) => (prev === "" ? (cameras[0]?.deviceId ?? "") : prev));
-        setSelectedMicDevice((prev) => (prev === "" ? (mics[0]?.deviceId ?? "") : prev));
-      } catch (err) {
-        console.error("Failed to enumerate devices:", err);
-      }
-    };
-
-    enumerateDevices();
-    navigator.mediaDevices.addEventListener("devicechange", enumerateDevices);
-    return () => {
-      navigator.mediaDevices.removeEventListener("devicechange", enumerateDevices);
-    };
-  }, []);
-
-  // Initialize camera preview
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-
-    const initCamera = async () => {
-      if (!isCameraEnabled) {
-        if (videoStream) {
-          videoStream.getTracks().forEach((track) => track.stop());
-          setVideoStream(null);
-        }
-        return;
-      }
-
-      try {
-        const videoConstraint: MediaTrackConstraints = selectedDevice
-          ? { deviceId: { exact: selectedDevice }, width: { ideal: 1280 }, height: { ideal: 720 } }
-          : { width: { ideal: 1280 }, height: { ideal: 720 } };
-
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: videoConstraint,
-          audio: false,
-        });
-        setVideoStream(stream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (err) {
-        console.error("Failed to get camera:", err);
-      }
-    };
-
-    initCamera();
-
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [isCameraEnabled, selectedDevice]);
-
-  // Update video element when stream changes
-  useEffect(() => {
-    if (videoRef.current && videoStream) {
-      videoRef.current.srcObject = videoStream;
-    }
-  }, [videoStream]);
-
-  // Real mic volume via AudioContext
-  useEffect(() => {
-    if (!isMicEnabled) {
-      setVolume(0);
-
-      if (animFrameRef.current !== null) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-      if (analyserRef.current) {
-        analyserRef.current.disconnect();
-        analyserRef.current = null;
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => {});
-        audioContextRef.current = null;
-      }
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-        micStreamRef.current = null;
-      }
-      return;
-    }
-
-    let cancelled = false;
-
-    const startAudio = async () => {
-      try {
-        const audioConstraint: MediaTrackConstraints | boolean = selectedMicDevice
-          ? { deviceId: { exact: selectedMicDevice } }
-          : true;
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: audioConstraint,
-          video: false,
-        });
-
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-
-        micStreamRef.current = stream;
-
-        const audioContext = new AudioContext();
-        audioContextRef.current = audioContext;
-
-        const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        analyserRef.current = analyser;
-
-        const source = audioContext.createMediaStreamSource(stream);
-        source.connect(analyser);
-
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-        const tick = () => {
-          if (cancelled) return;
-          analyser.getByteFrequencyData(dataArray);
-          let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
-          }
-          const avg = (sum / dataArray.length / 255) * 100;
-          setVolume(avg);
-          animFrameRef.current = requestAnimationFrame(tick);
-        };
-
-        animFrameRef.current = requestAnimationFrame(tick);
-      } catch (err) {
-        console.error("Failed to get microphone:", err);
-      }
-    };
-
-    startAudio();
-
-    return () => {
-      cancelled = true;
-
-      if (animFrameRef.current !== null) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-      if (analyserRef.current) {
-        analyserRef.current.disconnect();
-        analyserRef.current = null;
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => {});
-        audioContextRef.current = null;
-      }
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-        micStreamRef.current = null;
-      }
-    };
-  }, [isMicEnabled, selectedMicDevice]);
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
 
   // Countdown effect
   useEffect(() => {
     if (countdown === null) return;
     if (countdown === 0) {
-      onJoinRef.current();
+      onJoin();
       return;
     }
-    timeoutRef.current = setTimeout(() => setCountdown(countdown - 1), 1000);
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [countdown]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (videoStream) {
-        videoStream.getTracks().forEach((track) => track.stop());
-      }
-      if (animFrameRef.current !== null) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
-      if (analyserRef.current) {
-        analyserRef.current.disconnect();
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => {});
-      }
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-      }
-    };
-  }, []);
+    const timeout = setTimeout(() => setCountdown(countdown - 1), 1000);
+    return () => clearTimeout(timeout);
+  }, [countdown, onJoin]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl">
@@ -289,30 +68,32 @@ export function CallLobby({
           {/* Left: Video Preview */}
           <div className="space-y-4">
             <div className="relative aspect-video rounded-3xl overflow-hidden border border-white/10 bg-black/40 shadow-2xl">
-              {/* Native video preview */}
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
-                className="w-full h-full object-cover"
+              {/* Stream Video SDK VideoPreview component */}
+              <VideoPreview 
+                mirror={true}
+                DisabledVideoPreview={() => (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                    <div className="flex flex-col items-center gap-3 text-white/50">
+                      <VideoOff className="h-12 w-12" />
+                      <span className="text-sm">Camera is off</span>
+                    </div>
+                  </div>
+                )}
+                NoCameraPreview={() => (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                    <div className="flex flex-col items-center gap-3 text-white/50">
+                      <VideoOff className="h-12 w-12" />
+                      <span className="text-sm">No camera found</span>
+                    </div>
+                  </div>
+                )}
               />
 
               {/* Preview overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-              {/* Camera off state */}
-              {!isCameraEnabled && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                  <div className="flex flex-col items-center gap-3 text-white/50">
-                    <VideoOff className="h-12 w-12" />
-                    <span className="text-sm">Camera is off</span>
-                  </div>
-                </div>
-              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
 
               {/* Status badges */}
-              <div className="absolute top-4 left-4 flex items-center gap-2">
+              <div className="absolute top-4 left-4 flex items-center gap-2 pointer-events-none">
                 <div className={cn(
                   "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
                   isMicEnabled
@@ -333,12 +114,11 @@ export function CallLobby({
                 </div>
               </div>
 
-              {/* Volume indicator */}
+              {/* Volume indicator using Stream SDK */}
               {isMicEnabled && (
-                <div className="absolute bottom-4 left-4">
+                <div className="absolute bottom-4 left-4 pointer-events-none">
                   <div className="flex items-center gap-2 rounded-full bg-black/40 backdrop-blur-sm px-3 py-1.5 border border-white/10">
-                    <VolumeIndicator level={volume} />
-                    <span className="text-xs text-white/60 font-mono">{Math.round(volume)}%</span>
+                    <AudioVolumeIndicator />
                   </div>
                 </div>
               )}
@@ -368,6 +148,21 @@ export function CallLobby({
               >
                 {isCameraEnabled ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
               </button>
+              <button
+                onClick={() => setShowDeviceSettings(!showDeviceSettings)}
+                className={cn(
+                  "group flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-200",
+                  showDeviceSettings
+                    ? "bg-purple-500/30 text-purple-400 border border-purple-500/40"
+                    : "bg-white/10 hover:bg-white/15 text-white border border-white/10"
+                )}
+                title="Device Settings"
+              >
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -380,89 +175,88 @@ export function CallLobby({
               <p className="text-white/50">Check your audio and video before entering the call</p>
             </div>
 
-            <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6">
-              {/* Camera selection */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-white/60 uppercase tracking-wider">
-                  Camera
-                </label>
-                <Select
-                  value={selectedDevice}
-                  onValueChange={(value) => value && setSelectedDevice(value)}
-                >
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white hover:bg-white/10">
-                    <SelectValue placeholder="Select camera" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-white/10">
-                    {cameraDevices.length === 0 ? (
-                      <SelectItem value="default" disabled className="text-white/40">
-                        No camera found
-                      </SelectItem>
-                    ) : (
-                      cameraDevices.map((d, i) => (
-                        <SelectItem
-                          key={d.deviceId}
-                          value={d.deviceId}
-                          className="text-white hover:bg-white/10"
-                        >
-                          {d.label || `Camera ${i + 1}`}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Microphone selection */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-white/60 uppercase tracking-wider">
-                  Microphone
-                </label>
-                <Select
-                  value={selectedMicDevice}
-                  onValueChange={(value) => value && setSelectedMicDevice(value)}
-                >
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white hover:bg-white/10">
-                    <SelectValue placeholder="Select microphone" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-white/10">
-                    {micDevices.length === 0 ? (
-                      <SelectItem value="default" disabled className="text-white/40">
-                        No microphone found
-                      </SelectItem>
-                    ) : (
-                      micDevices.map((d, i) => (
-                        <SelectItem
-                          key={d.deviceId}
-                          value={d.deviceId}
-                          className="text-white hover:bg-white/10"
-                        >
-                          {d.label || `Microphone ${i + 1}`}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Background effects */}
-              <div className="flex items-center justify-between py-2">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/15 text-purple-400">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">Background blur</p>
-                    <p className="text-xs text-white/40">Keep your background private</p>
-                  </div>
+            {showDeviceSettings ? (
+              /* Stream SDK DeviceSettings component */
+              <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-medium text-white/80">Device Settings</h3>
+                  <button
+                    onClick={() => setShowDeviceSettings(false)}
+                    className="text-xs text-white/50 hover:text-white/80 transition-colors"
+                  >
+                    Hide
+                  </button>
                 </div>
-                <Switch
-                  checked={backgroundBlur}
-                  onCheckedChange={setBackgroundBlur}
-                  className="data-[state=checked]:bg-purple-500"
-                />
+                <DeviceSettings />
               </div>
-            </div>
+            ) : (
+              /* Simple settings panel */
+              <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+                {/* Camera selection */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Camera
+                  </label>
+                  <DeviceSelectorVideo visualType="dropdown" />
+                </div>
+
+                {/* Microphone selection */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Microphone
+                  </label>
+                  <DeviceSelectorAudioInput 
+                    visualType="dropdown" 
+                    volumeIndicatorVisible={true} 
+                  />
+                </div>
+
+                {/* Speaker selection */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Speaker
+                  </label>
+                  <DeviceSelectorAudioOutput 
+                    visualType="dropdown" 
+                    speakerTestVisible={true} 
+                  />
+                </div>
+
+                {/* Speaker test */}
+                <div className="flex items-center justify-between py-2 border-t border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">Test Speaker</p>
+                      <p className="text-xs text-white/40">Play a sound to test your speakers</p>
+                    </div>
+                  </div>
+                  <SpeakerTest />
+                </div>
+
+                {/* Background effects */}
+                <div className="flex items-center justify-between py-2 border-t border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/15 text-purple-400">
+                      <Sparkles className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">Background blur</p>
+                      <p className="text-xs text-white/40">Keep your background private</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={backgroundBlur}
+                    onCheckedChange={setBackgroundBlur}
+                    className="data-[state=checked]:bg-purple-500"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Action buttons */}
             <div className="flex items-center gap-3">

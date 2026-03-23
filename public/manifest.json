@@ -1,0 +1,42 @@
+{
+  "name": "Stream School",
+  "short_name": "StreamSchool",
+  "description": "Interactive educational platform for virtual classrooms",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "scope": "/",
+  "categories": ["education", "social"],
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "View your dashboard",
+      "url": "/dashboard"
+    },
+    {
+      "name": "Classes",
+      "short_name": "Classes",
+      "description": "View your classes",
+      "url": "/classes"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}

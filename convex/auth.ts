@@ -1,8 +1,9 @@
-import { action, query, type ActionCtx, type QueryCtx } from "./_generated/server";
+import { action, query, type ActionCtx, type QueryCtx, internalAction, internalMutation } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { type Id } from "./_generated/dataModel";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const userRoleReturn = v.union(
   v.literal("student"),
@@ -10,6 +11,12 @@ const userRoleReturn = v.union(
   v.literal("co_teacher"),
   v.literal("parent"),
   v.literal("admin")
+);
+
+const parentalConsentStatusReturn = v.union(
+  v.literal("pending"),
+  v.literal("approved"),
+  v.literal("not_required")
 );
 
 type AuthResult = {

@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useCall } from "@stream-io/video-react-sdk";
+import {
+  useCall,
+  useCallStateHooks,
+  RecordingInProgressNotification,
+} from "@stream-io/video-react-sdk";
 import { useMutation } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
@@ -28,7 +32,8 @@ interface RecordingControlsProps {
 
 export function RecordingControls({ isTeacher, sessionId }: RecordingControlsProps) {
   const call = useCall();
-  const [isRecording, setIsRecording] = useState(false);
+  const { useIsCallRecordingInProgress } = useCallStateHooks();
+  const isRecording = useIsCallRecordingInProgress();
   const [open, setOpen] = useState(false);
   const markRecordingStarted = useMutation(api.recordings.markRecordingStarted);
   const markRecordingEnded = useMutation(api.recordings.markRecordingEnded);
@@ -39,7 +44,6 @@ export function RecordingControls({ isTeacher, sessionId }: RecordingControlsPro
     if (!call) return;
     try {
       await call.startRecording();
-      setIsRecording(true);
       
       // Mark recording as started in our database
       if (sessionId) {
@@ -57,7 +61,6 @@ export function RecordingControls({ isTeacher, sessionId }: RecordingControlsPro
     if (!call) return;
     try {
       await call.stopRecording();
-      setIsRecording(false);
       
       // Mark recording as ended in our database
       if (sessionId) {
@@ -72,13 +75,15 @@ export function RecordingControls({ isTeacher, sessionId }: RecordingControlsPro
 
   if (isRecording) {
     return (
-      <div className="flex items-center gap-2">
-        <Circle className="h-3 w-3 fill-red-500 text-red-500 animate-pulse" />
-        <span className="text-sm font-medium text-red-500">Recording</span>
-        <Button variant="ghost" size="sm" onClick={handleStopRecording}>
-          Stop
-        </Button>
-      </div>
+      <RecordingInProgressNotification text="Recording in progress...">
+        <div className="flex items-center gap-2">
+          <Circle className="h-3 w-3 fill-red-500 text-red-500 animate-pulse" />
+          <span className="text-sm font-medium text-red-500">Recording</span>
+          <Button variant="ghost" size="sm" onClick={handleStopRecording}>
+            Stop
+          </Button>
+        </div>
+      </RecordingInProgressNotification>
     );
   }
 

@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useCall, useCallStateHooks } from "@stream-io/video-react-sdk";
+import {
+  useCall,
+  useCallStateHooks,
+  SpeakingWhileMutedNotification,
+  ToggleAudioPublishingButton,
+  ToggleVideoPublishingButton,
+  ScreenShareButton,
+} from "@stream-io/video-react-sdk";
 import { Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, UserPlus } from "lucide-react";
 import { UserSearchModal } from "@/components/chat/UserSearchModal";
 import { cn } from "@/lib/utils";
@@ -69,28 +76,13 @@ export function CallControls({ onLeave }: CallControlsProps) {
     <div className="shrink-0 flex items-center justify-center gap-2.5 px-6 py-5"
       style={{ background: "oklch(0.072 0.022 268 / 95%)", borderTop: "1px solid oklch(1 0 0 / 7%)" }}>
 
-      <ControlButton
-        onClick={() => call?.microphone.toggle()}
-        active={isMicOn}
-        title={isMicOn ? "Mute microphone" : "Unmute microphone"}
-      >
-        {isMicOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-      </ControlButton>
+      <SpeakingWhileMutedNotification text="You are muted. Unmute to speak.">
+        <ToggleAudioPublishingButton />
+      </SpeakingWhileMutedNotification>
 
-      <ControlButton
-        onClick={() => call?.camera.toggle()}
-        active={isCamOn}
-        title={isCamOn ? "Turn off camera" : "Turn on camera"}
-      >
-        {isCamOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-      </ControlButton>
+      <ToggleVideoPublishingButton />
 
-      <ControlButton
-        onClick={() => call?.screenShare.toggle()}
-        title="Share screen"
-      >
-        <Monitor className="h-5 w-5" />
-      </ControlButton>
+      <ScreenShareButton />
 
       <ControlButton
         onClick={() => setShowAddParticipant(true)}

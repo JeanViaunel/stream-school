@@ -19,56 +19,15 @@ import { Lobby } from "./Lobby";
 import { LobbyAdmitter } from "./LobbyAdmitter";
 import { CallEnded } from "./CallEnded";
 import { FloatingControls } from "./FloatingControls";
+import { PermissionRequests } from "./PermissionRequests";
+import { RequestPermissionButton } from "./RequestPermissionButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGradeSkin } from "@/contexts/GradeSkinContext";
 import { toast } from "sonner";
-import { Loader2, MicOff, Captions } from "lucide-react";
-
-type CallWithTranscription = Call & {
-  startTranscription?: () => Promise<void>;
-  stopTranscription?: () => Promise<void>;
-};
-
-function TranscriptionControls({ isTeacher }: { isTeacher: boolean }) {
-  const call = useCall() as CallWithTranscription | undefined;
-  const [captionsOn, setCaptionsOn] = useState(false);
-
-  async function toggleCaptions() {
-    if (!call) return;
-    try {
-      if (captionsOn) {
-        await call.stopTranscription?.();
-        setCaptionsOn(false);
-        toast.success("Captions stopped");
-      } else {
-        await call.startTranscription?.();
-        setCaptionsOn(true);
-        toast.success("Captions started");
-      }
-    } catch {
-      toast.error("Transcription is not available for this call");
-    }
-  }
-
-  if (!isTeacher) return null;
-
-  return (
-    <div className="absolute bottom-28 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        className="gap-2"
-        onClick={toggleCaptions}
-        aria-pressed={captionsOn}
-        aria-label={captionsOn ? "Turn off live captions" : "Turn on live captions"}
-      >
-        <Captions className="h-4 w-4" />
-        CC
-      </Button>
-    </div>
-  );
-}
+import { Loader2, MicOff } from "lucide-react";
+import { TranscriptionToggle } from "./TranscriptionToggle";
+import { ClosedCaptions } from "./ClosedCaptions";
+import { ToggleClosedCaptions } from "./ToggleClosedCaptions";
 
 interface PendingUser {
   id: string;
@@ -109,6 +68,7 @@ function ClassCallRoomInner({
   const isPrimaryBand = gradeBand === "primary";
 
   const [showEnded, setShowEnded] = useState(false);
+  const [showRinging, setShowRinging] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [wasTerminated, setWasTerminated] = useState(false);
   const endHandledRef = useRef(false);
@@ -125,6 +85,15 @@ function ClassCallRoomInner({
       setCallDuration((d) => d + 1);
     }, 1000);
     return () => clearInterval(interval);
+  }, [callingState]);
+
+  // Handle ringing state transitions
+  useEffect(() => {
+    if (callingState === CallingState.RINGING) {
+      setShowRinging(true);
+    } else if (callingState === CallingState.JOINED) {
+      setShowRinging(false);
+    }
   }, [callingState]);
 
   // Detect when call ends (either by host or by leaving) and release media
@@ -158,6 +127,53 @@ function ClassCallRoomInner({
     );
   }
 
+  // Show ringing/lobby UI while in RINGING state
+  if (showRinging || callingState === CallingState.RINGING || callingState === CallingState.JOINING) {
+    return (
+      <div className="fixed inset-0 bg-slate-950 flex items-center justify-center">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/50 via-slate-950 to-purple-950/30" />
+        
+        <div className="relative z-10 text-center space-y-6">
+          {/* Animated rings */}
+          <div className="relative flex justify-center">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute h-40 w-40 rounded-full border-2 border-purple-500/20 animate-ring-pulse" />
+              <div className="absolute h-48 w-48 rounded-full border border-purple-500/10 animate-ring-pulse" style={{ animationDelay: "0.3s" }} />
+              <div className="absolute h-56 w-56 rounded-full border border-purple-500/5 animate-ring-pulse" style={{ animationDelay: "0.6s" }} />
+            </div>
+            
+            <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-purple-500/30 to-indigo-500/30 border-2 border-purple-500/40 shadow-2xl shadow-purple-500/20">
+              <span className="text-3xl font-bold text-white" style={{ fontFamily: "var(--font-syne)" }}>
+                📞
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "var(--font-syne)" }}>
+              {callingState === CallingState.RINGING ? "Ringing..." : "Joining classroom..."}
+            </h2>
+            <p className="text-white/50">
+              {callingState === CallingState.RINGING 
+                ? "Waiting for others to answer" 
+                : "Connecting to the classroom"}
+            </p>
+          </div>
+
+          {/* Cancel button for outgoing ring calls */}
+          {call?.isCreatedByMe && callingState === CallingState.RINGING && (
+            <button
+              onClick={() => call?.leave({ reject: true, reason: "cancel" })}
+              className="px-6 py-3 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+            >
+              Cancel Call
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative h-full bg-slate-950">
       <StreamTheme className="relative w-full h-full bg-transparent">
@@ -181,7 +197,11 @@ function ClassCallRoomInner({
         </div>
       )}
 
-      <TranscriptionControls isTeacher={isTeacher} />
+      {/* Transcription controls for teacher */}
+      <TranscriptionToggle isTeacher={isTeacher} />
+
+      {/* Closed captions overlay for all users */}
+      <ClosedCaptions />
 
       {/* Lobby admitter panel for teacher */}
       {isTeacher && pendingUsers.length > 0 && (
@@ -191,6 +211,16 @@ function ClassCallRoomInner({
             onAdmit={onAdmit}
             onDeny={onDeny}
           />
+        </div>
+      )}
+
+      {/* Permission requests notification panel for teacher/moderator */}
+      {isTeacher && <PermissionRequests />}
+
+      {/* Permission request buttons for students */}
+      {!isTeacher && (
+        <div className="absolute bottom-28 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+          <RequestPermissionButton />
         </div>
       )}
 
