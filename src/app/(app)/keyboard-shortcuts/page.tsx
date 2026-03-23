@@ -114,7 +114,6 @@ export default function KeyboardShortcutsPage() {
                 </div>
               </div>
             ))}
-          </div>
         </div>
       </div>
     </div>

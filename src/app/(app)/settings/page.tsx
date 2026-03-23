@@ -18,7 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,14 +43,16 @@ const SETTING_GROUPS: SettingGroup[] = [
       {
         id: "desktopNotifications",
         label: "Desktop Notifications",
-        description: "Show browser notifications for new messages when the window is in the background",
+        description:
+          "Show browser notifications for new messages when the window is in the background"
       },
       {
         id: "messagePreview",
         label: "Message Preview",
-        description: "Show message content in notifications (disable for privacy)",
-      },
-    ],
+        description:
+          "Show message content in notifications (disable for privacy)"
+      }
+    ]
   },
   {
     title: "Sound",
@@ -58,14 +60,14 @@ const SETTING_GROUPS: SettingGroup[] = [
       {
         id: "messageSounds",
         label: "Message Sounds",
-        description: "Play a sound when you receive a new message",
+        description: "Play a sound when you receive a new message"
       },
       {
         id: "callSounds",
         label: "Call Sounds",
-        description: "Play a ringtone for incoming video/audio calls",
-      },
-    ],
+        description: "Play a ringtone for incoming video/audio calls"
+      }
+    ]
   },
   {
     title: "Privacy",
@@ -73,14 +75,16 @@ const SETTING_GROUPS: SettingGroup[] = [
       {
         id: "readReceipts",
         label: "Send Read Receipts",
-        description: "Let others know when you've opened and read their messages",
+        description:
+          "Let others know when you've opened and read their messages"
       },
       {
         id: "typingIndicators",
         label: "Typing Indicators",
-        description: "Show the typing indicator when you are composing a message",
-      },
-    ],
+        description:
+          "Show the typing indicator when you are composing a message"
+      }
+    ]
   },
   {
     title: "Appearance",
@@ -88,15 +92,16 @@ const SETTING_GROUPS: SettingGroup[] = [
       {
         id: "compactMode",
         label: "Compact Mode",
-        description: "Reduce spacing and font size for a denser message layout",
+        description: "Reduce spacing and font size for a denser message layout"
       },
       {
         id: "animations",
         label: "Animations",
-        description: "Enable UI transition and motion animations throughout the app",
-      },
-    ],
-  },
+        description:
+          "Enable UI transition and motion animations throughout the app"
+      }
+    ]
+  }
 ];
 
 export default function SettingsPage() {
@@ -115,7 +120,7 @@ export default function SettingsPage() {
     try {
       const json = await exportData({
         username: session.username,
-        password: exportPassword,
+        password: exportPassword
       });
       const blob = new Blob([json], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -139,7 +144,7 @@ export default function SettingsPage() {
     try {
       await deleteAccount({
         username: session.username,
-        password: deletePassword,
+        password: deletePassword
       });
       toast.success("Account scheduled for deletion");
       logout();
@@ -154,134 +159,138 @@ export default function SettingsPage() {
   return (
     <div className="w-full px-4 sm:px-8 py-6 sm:py-10">
       <div className="max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1
-              className="text-2xl font-bold tracking-tight gradient-text"
-              style={{ fontFamily: "var(--font-syne)" }}
-            >
-              Settings
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Customize your experience
-            </p>
-          </div>
+        {/* Header */}
+        <div className="mb-8">
+          <h1
+            className="text-2xl font-bold tracking-tight gradient-text"
+            style={{ fontFamily: "var(--font-syne)" }}
+          >
+            Settings
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Customize your experience
+          </p>
+        </div>
 
-          <div className="space-y-8">
-            {SETTING_GROUPS.map((group) => (
-              <div key={group.title}>
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  {group.title}
-                </h2>
-                <div className="rounded-xl border border-border/50 bg-card/40 overflow-hidden">
-                  {group.items.map((item, i) => (
-                    <div key={item.id}>
-                      <div className="flex items-center justify-between px-4 py-4">
-                        <div className="flex-1 min-w-0 pr-6">
-                          <p className="text-sm font-medium">{item.label}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {item.description}
-                          </p>
-                        </div>
-                        <Switch
-                          checked={settings[item.id] as boolean}
-                          onCheckedChange={(v) => {
-                            updateSetting(item.id, v);
-                            toast.success(`${item.label} ${v ? "enabled" : "disabled"}`);
-                          }}
-                        />
+        <div className="space-y-8">
+          {SETTING_GROUPS.map((group) => (
+            <div key={group.title}>
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                {group.title}
+              </h2>
+              <div className="rounded-xl border border-border/50 bg-card/40 overflow-hidden">
+                {group.items.map((item, i) => (
+                  <div key={item.id}>
+                    <div className="flex items-center justify-between px-4 py-4">
+                      <div className="flex-1 min-w-0 pr-6">
+                        <p className="text-sm font-medium">{item.label}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {item.description}
+                        </p>
                       </div>
-                      {i < group.items.length - 1 && (
-                        <Separator className="bg-border/30 mx-4" />
-                      )}
+                      <Switch
+                        checked={settings[item.id] as boolean}
+                        onCheckedChange={(v) => {
+                          updateSetting(item.id, v);
+                          toast.success(
+                            `${item.label} ${v ? "enabled" : "disabled"}`
+                          );
+                        }}
+                      />
                     </div>
-                  ))}
-                </div>
+                    {i < group.items.length - 1 && (
+                      <Separator className="bg-border/30 mx-4" />
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
 
-          <div>
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              Data &amp; account
-            </h2>
-            <div className="rounded-xl border border-border/50 bg-card/40 overflow-hidden px-4 py-4 space-y-6">
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Export my data</p>
-                <p className="text-xs text-muted-foreground">
-                  Download a JSON archive of your profile and enrollments. Enter your password to confirm.
-                </p>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor="export-pw">Password</Label>
-                    <Input
-                      id="export-pw"
-                      type="password"
-                      autoComplete="current-password"
-                      value={exportPassword}
-                      onChange={(e) => setExportPassword(e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={exporting || !exportPassword}
-                    onClick={handleExport}
-                  >
-                    {exporting ? "Exporting…" : "Download JSON"}
-                  </Button>
+        <div>
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Data &amp; account
+          </h2>
+          <div className="rounded-xl border border-border/50 bg-card/40 overflow-hidden px-4 py-4 space-y-6">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Export my data</p>
+              <p className="text-xs text-muted-foreground">
+                Download a JSON archive of your profile and enrollments. Enter
+                your password to confirm.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="flex-1 space-y-1">
+                  <Label htmlFor="export-pw">Password</Label>
+                  <Input
+                    id="export-pw"
+                    type="password"
+                    autoComplete="current-password"
+                    value={exportPassword}
+                    onChange={(e) => setExportPassword(e.target.value)}
+                  />
                 </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={exporting || !exportPassword}
+                  onClick={handleExport}
+                >
+                  {exporting ? "Exporting…" : "Download JSON"}
+                </Button>
               </div>
-              <Separator className="bg-border/30" />
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Delete my account</p>
-                <p className="text-xs text-muted-foreground">
-                  Deactivates your account and schedules removal of personal data after a 30-day retention window.
-                </p>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor="delete-pw">Password</Label>
-                    <Input
-                      id="delete-pw"
-                      type="password"
-                      autoComplete="current-password"
-                      value={deletePassword}
-                      onChange={(e) => setDeletePassword(e.target.value)}
-                    />
-                  </div>
-                  <AlertDialog>
-                    <AlertDialogTrigger
-                      type="button"
-                      disabled={!deletePassword}
-                      className={cn(
-                        buttonVariants({ variant: "destructive" }),
-                        "w-full sm:w-auto",
-                      )}
-                    >
-                      Delete account
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This cannot be undone from the app. Your account will be deactivated and PII removed after the retention period.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={(e) => {
-                            e.preventDefault();
-                            void handleDelete();
-                          }}
-                          disabled={deleting}
-                        >
-                          {deleting ? "Working…" : "Confirm delete"}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+            </div>
+            <Separator className="bg-border/30" />
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Delete my account</p>
+              <p className="text-xs text-muted-foreground">
+                Deactivates your account and schedules removal of personal data
+                after a 30-day retention window.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="flex-1 space-y-1">
+                  <Label htmlFor="delete-pw">Password</Label>
+                  <Input
+                    id="delete-pw"
+                    type="password"
+                    autoComplete="current-password"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                  />
                 </div>
+                <AlertDialog>
+                  <AlertDialogTrigger
+                    type="button"
+                    disabled={!deletePassword}
+                    className={cn(
+                      buttonVariants({ variant: "destructive" }),
+                      "w-full sm:w-auto"
+                    )}
+                  >
+                    Delete account
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This cannot be undone from the app. Your account will be
+                        deactivated and PII removed after the retention period.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={(e) => {
+                          e.preventDefault();
+                          void handleDelete();
+                        }}
+                        disabled={deleting}
+                      >
+                        {deleting ? "Working…" : "Confirm delete"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           </div>
