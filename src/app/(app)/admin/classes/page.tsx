@@ -96,8 +96,10 @@ export default function AdminClassesPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Teacher ID</span>
-                    <span className="font-medium">{cls.teacherId}</span>
+                    <span className="text-muted-foreground">Teacher</span>
+                    <span className="font-medium">
+                      {cls.teacherDisplayName ?? cls.teacherId}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Join Code</span>
@@ -151,8 +153,10 @@ export default function AdminClassesPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Teacher ID</span>
-                    <span className="font-medium">{cls.teacherId}</span>
+                    <span className="text-muted-foreground">Teacher</span>
+                    <span className="font-medium">
+                      {cls.teacherDisplayName ?? cls.teacherId}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Join Code</span>

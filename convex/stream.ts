@@ -57,12 +57,54 @@ export const createClassChannel = internalAction({
       process.env.STREAM_API_KEY!,
       process.env.STREAM_API_SECRET!
     );
-    const channel = chatClient.channel("classroom", channelId, {
+
+    const channelTypeName = "classroom";
+
+    const channel = chatClient.channel(channelTypeName, channelId, {
       name,
       created_by_id: teacherStreamUserId,
     } as Record<string, unknown>);
-    await channel.create();
-    return null;
+
+    const isMissingChannelTypeError = (err: unknown): boolean => {
+      const message = err instanceof Error ? err.message : String(err);
+      return /channel type does not exist/i.test(message) || /not found/i.test(message);
+    };
+
+    try {
+      await channel.create();
+      return null;
+    } catch (err: unknown) {
+      if (!isMissingChannelTypeError(err)) {
+        throw err;
+      }
+
+      // If the type doesn't exist yet (new Stream project / fresh environment),
+      // create it and retry channel creation once.
+      try {
+        await chatClient.createChannelType({
+          name: channelTypeName,
+          // Match the intended classroom features from `EDU-SETUP.md`.
+          typing_events: true,
+          read_events: true,
+          search: true,
+          reactions: true,
+          replies: true,
+        });
+      } catch (createErr: unknown) {
+        const createMessage = createErr instanceof Error ? createErr.message : String(createErr);
+        const isAlreadyExists =
+          /already exists|duplicate|conflict/i.test(createMessage) ||
+          /channel type does not exist/i.test(createMessage);
+        if (!isAlreadyExists) {
+          throw createErr;
+        }
+      }
+
+      // Small delay helps in cases where Stream needs a brief propagation window.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await channel.create();
+      return null;
+    }
   },
 });
 

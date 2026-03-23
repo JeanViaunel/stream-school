@@ -70,7 +70,7 @@ export default function SessionPage() {
         <ClassCallRoom
           callId={sessionId}
           className={classData.name}
-          teacherName={"Teacher"} // TODO: Fetch teacher name
+          teacherName={classData.teacher?.displayName ?? "Teacher"}
           teacherId={classData.teacherId}
           onLeave={() => router.push(`/class/${classId}`)}
         />

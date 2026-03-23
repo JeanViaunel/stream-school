@@ -112,8 +112,15 @@ export default function AdminUsersPage() {
       case "teacher": return "bg-green-500/20 text-green-500";
       case "parent": return "bg-purple-500/20 text-purple-500";
       case "school_admin": return "bg-red-500/20 text-red-500";
+      case "platform_admin": return "bg-red-500/20 text-red-500";
       default: return "bg-gray-500/20 text-gray-500";
     }
+  };
+
+  const getRoleLabel = (role?: string) => {
+    if (!role) return "-";
+    if (role === "school_admin" || role === "platform_admin") return "admin";
+    return role;
   };
 
   if (!session || (session.role !== "school_admin" && session.role !== "platform_admin")) {
@@ -173,7 +180,7 @@ export default function AdminUsersPage() {
                       <SelectItem value="student">Student</SelectItem>
                       <SelectItem value="teacher">Teacher</SelectItem>
                       <SelectItem value="parent">Parent</SelectItem>
-                      <SelectItem value="school_admin">School Admin</SelectItem>
+                      <SelectItem value="school_admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -262,9 +269,7 @@ export default function AdminUsersPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={getRoleBadgeColor(user.role)}>
-                      {user.role}
-                    </Badge>
+                    <Badge className={getRoleBadgeColor(user.role)}>{getRoleLabel(user.role)}</Badge>
                   </TableCell>
                   <TableCell>
                     {user.gradeLevel ? `Grade ${user.gradeLevel}` : "-"}

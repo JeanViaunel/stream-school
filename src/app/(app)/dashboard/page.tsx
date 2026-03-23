@@ -22,6 +22,7 @@ import {
   School,
 } from "lucide-react";
 import { CalendarView } from "@/components/schedule/CalendarView";
+import { CreateClassModal } from "@/components/class/CreateClassModal";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function DashboardPage() {
   const { session } = useAuth();
   const [joinCode, setJoinCode] = useState("");
   const [showJoinDialog, setShowJoinDialog] = useState(false);
+  const [createClassOpen, setCreateClassOpen] = useState(false);
   
   const teacherClasses = useQuery(
     api.classes.getClassesByTeacher,
@@ -103,6 +105,11 @@ export default function DashboardPage() {
                   <p className="text-sm text-muted-foreground capitalize mb-4">
                     {cls.subject}
                   </p>
+                  {cls.teacherDisplayName && (
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Teacher: {cls.teacherDisplayName}
+                    </p>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">
                       No upcoming sessions
@@ -169,12 +176,10 @@ export default function DashboardPage() {
               Manage your classes and sessions
             </p>
           </div>
-          <Link href="/class/create">
-            <Button>
+          <Button onClick={() => setCreateClassOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Create Class
             </Button>
-          </Link>
         </header>
 
         <div className="mb-8">
@@ -210,7 +215,11 @@ export default function DashboardPage() {
           ))}
 
           {/* Create class card */}
-          <Link href="/class/create">
+          <button
+            type="button"
+            className="w-full"
+            onClick={() => setCreateClassOpen(true)}
+          >
             <Card className="border-dashed hover:border-primary/50 cursor-pointer h-full">
               <CardContent className="flex flex-col items-center justify-center h-full min-h-[200px] text-center">
                 <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mb-3">
@@ -222,8 +231,9 @@ export default function DashboardPage() {
                 </p>
               </CardContent>
             </Card>
-          </Link>
+          </button>
         </div>
+        <CreateClassModal open={createClassOpen} onOpenChange={setCreateClassOpen} />
       </div>
     );
   }

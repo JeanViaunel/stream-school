@@ -122,6 +122,12 @@ export default function ClassPage() {
             streamChannelId: classData.streamChannelId,
             joinCode: classData.joinCode,
             teacherId: classData.teacherId,
+            teacher: classData.teacher
+              ? {
+                  displayName: classData.teacher.displayName,
+                  avatarUrl: classData.teacher.avatarUrl,
+                }
+              : undefined,
           }}
           enrollmentCount={0}
           isActiveSession={false}

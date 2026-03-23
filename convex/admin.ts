@@ -137,6 +137,7 @@ export const getAllClasses = query({
       _creationTime: v.number(),
       organizationId: v.id("organizations"),
       teacherId: v.id("users"),
+      teacherDisplayName: v.optional(v.string()),
       name: v.string(),
       subject: v.string(),
       gradeLevel: v.number(),
@@ -177,9 +178,12 @@ export const getAllClasses = query({
           .filter((q) => q.eq(q.field("status"), "active"))
           .collect();
 
+        const teacher = await ctx.db.get(cls.teacherId);
+
         return {
           ...cls,
           enrollmentCount: enrollments.length,
+          teacherDisplayName: teacher?.displayName,
         };
       })
     );
@@ -235,6 +239,68 @@ export const getAllUsers = query({
       isActive: u.isActive,
       createdAt: u.createdAt,
     }));
+  },
+});
+
+// Get dashboard user/class stats for admin overview cards
+export const getDashboardStats = query({
+  args: {},
+  returns: v.object({
+    totalUsers: v.number(),
+    activeUsers: v.number(),
+    totalStudents: v.number(),
+    totalTeachers: v.number(),
+    totalClasses: v.number(),
+    activeClasses: v.number(),
+  }),
+  handler: async (ctx) => {
+    if (!(await isAdmin(ctx))) {
+      throw new Error("Only admins can view dashboard stats");
+    }
+
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const adminUser = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!adminUser) throw new Error("Admin user not found");
+
+    // Unify admin behavior: both admin roles should follow the same data scope rules.
+    // If an admin has an org, scope to that org; otherwise fall back to global.
+    const orgId = adminUser.organizationId;
+
+    const users = orgId
+      ? await ctx.db
+          .query("users")
+          .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+          .collect()
+      : await ctx.db.query("users").collect();
+
+    const classes = orgId
+      ? await ctx.db
+          .query("classes")
+          .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+          .collect()
+      : await ctx.db.query("classes").collect();
+
+    const totalUsers = users.length;
+    const activeUsers = users.filter((u) => !!u.isActive).length;
+    const totalStudents = users.filter((u) => u.role === "student").length;
+    const totalTeachers = users.filter((u) => u.role === "teacher").length;
+    const totalClasses = classes.length;
+    const activeClasses = classes.filter((c) => !c.isArchived).length;
+
+    return {
+      totalUsers,
+      activeUsers,
+      totalStudents,
+      totalTeachers,
+      totalClasses,
+      activeClasses,
+    };
   },
 });
 

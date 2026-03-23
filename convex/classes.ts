@@ -106,6 +106,8 @@ export const getClassesByTeacher = query({
       _creationTime: v.number(),
       organizationId: v.id("organizations"),
       teacherId: v.id("users"),
+      teacherDisplayName: v.optional(v.string()),
+      teacherAvatarUrl: v.optional(v.string()),
       name: v.string(),
       subject: v.string(),
       gradeLevel: v.number(),
@@ -130,11 +132,17 @@ export const getClassesByTeacher = query({
       throw new Error("User not found");
     }
 
-    return await ctx.db
+    const classes = await ctx.db
       .query("classes")
       .withIndex("by_teacher", (q) => q.eq("teacherId", user._id))
       .filter((q) => q.eq(q.field("isArchived"), false))
       .collect();
+
+    return classes.map((cls) => ({
+      ...cls,
+      teacherDisplayName: user.displayName,
+      teacherAvatarUrl: user.avatarUrl,
+    }));
   },
 });
 
@@ -146,6 +154,8 @@ export const getClassesByStudent = query({
       _creationTime: v.number(),
       organizationId: v.id("organizations"),
       teacherId: v.id("users"),
+      teacherDisplayName: v.optional(v.string()),
+      teacherAvatarUrl: v.optional(v.string()),
       name: v.string(),
       subject: v.string(),
       gradeLevel: v.number(),
@@ -180,13 +190,18 @@ export const getClassesByStudent = query({
       enrollments.map(async (enrollment) => {
         const cls = await ctx.db.get(enrollment.classId);
         if (cls && !cls.isArchived) {
-          return cls;
+          const teacher = await ctx.db.get(cls.teacherId);
+          return {
+            ...cls,
+            teacherDisplayName: teacher?.displayName,
+            teacherAvatarUrl: teacher?.avatarUrl,
+          };
         }
         return null;
       })
     );
 
-    return classes.filter((c): c is typeof c & { _id: string } => c !== null);
+    return classes.filter((c): c is NonNullable<typeof c> => c !== null);
   },
 });
 
@@ -198,6 +213,12 @@ export const getClassById = query({
       _creationTime: v.number(),
       organizationId: v.id("organizations"),
       teacherId: v.id("users"),
+      teacher: v.optional(
+        v.object({
+          displayName: v.string(),
+          avatarUrl: v.optional(v.string()),
+        })
+      ),
       name: v.string(),
       subject: v.string(),
       gradeLevel: v.number(),
@@ -240,7 +261,16 @@ export const getClassById = query({
       throw new Error("Not authorized to view this class");
     }
 
-    return cls;
+    const teacher = await ctx.db.get(cls.teacherId);
+    return {
+      ...cls,
+      teacher: teacher
+        ? {
+            displayName: teacher.displayName,
+            avatarUrl: teacher.avatarUrl,
+          }
+        : undefined,
+    };
   },
 });
 

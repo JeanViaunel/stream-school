@@ -41,6 +41,11 @@ export default function AdminPage() {
     session?.role === "school_admin" || session?.role === "platform_admin" ? {} : "skip"
   );
 
+  const stats = useQuery(
+    api.admin.getDashboardStats,
+    session?.role === "school_admin" || session?.role === "platform_admin" ? {} : "skip"
+  );
+
   if (!session) {
     return null;
   }
@@ -57,10 +62,10 @@ export default function AdminPage() {
     );
   }
 
-  const activeUsers = users?.filter(u => u.isActive).length || 0;
-  const totalUsers = users?.length || 0;
-  const activeClasses = classes?.filter(c => !c.isArchived).length || 0;
-  const totalClasses = classes?.length || 0;
+  const activeUsers = stats?.activeUsers ?? 0;
+  const totalUsers = stats?.totalUsers ?? 0;
+  const activeClasses = stats?.activeClasses ?? 0;
+  const totalClasses = stats?.totalClasses ?? 0;
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -112,7 +117,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {users?.filter(u => u.role === "student").length || 0}
+              {stats?.totalStudents ?? 0}
             </div>
           </CardContent>
         </Card>
@@ -125,7 +130,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {users?.filter(u => u.role === "teacher").length || 0}
+              {stats?.totalTeachers ?? 0}
             </div>
           </CardContent>
         </Card>
