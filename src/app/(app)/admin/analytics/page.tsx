@@ -15,11 +15,7 @@ export default function AdminAnalyticsPage() {
   const { session } = useAuth();
 
   useEffect(() => {
-    if (
-      session &&
-      session.role !== "school_admin" &&
-      session.role !== "platform_admin"
-    ) {
+    if (session && session.role !== "admin") {
       router.push("/dashboard");
     }
   }, [session, router]);
@@ -28,7 +24,7 @@ export default function AdminAnalyticsPage() {
     return null;
   }
 
-  if (session.role !== "school_admin" && session.role !== "platform_admin") {
+  if (session.role !== "admin") {
     return (
       <div className="w-full px-4 md:px-6 py-6">
         <Card>

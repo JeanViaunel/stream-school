@@ -37,7 +37,7 @@ export function CreateClassModal({ open, onOpenChange }: Props) {
   const createClass = useAction(api.classes.createClass);
 
   const canCreate =
-    session?.role === "teacher" || session?.role === "school_admin";
+    session?.role === "teacher" || session?.role === "admin";
 
   const handleClose = () => {
     onOpenChange(false);

@@ -13,8 +13,7 @@ export default defineSchema({
       v.literal("teacher"),
       v.literal("co_teacher"),
       v.literal("parent"),
-      v.literal("school_admin"),
-      v.literal("platform_admin")
+      v.literal("admin")
     )),
     organizationId: v.optional(v.id("organizations")),
     gradeLevel: v.optional(v.number()),

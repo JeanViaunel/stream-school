@@ -86,7 +86,7 @@ export function ClassSidebar() {
   // Fetch classes based on user role
   const teacherClasses = useQuery(
     api.classes.getClassesByTeacher,
-    session?.role === "teacher" || session?.role === "school_admin" ? {} : "skip"
+    session?.role === "teacher" || session?.role === "admin" ? {} : "skip"
   );
   
   const studentClasses = useQuery(
@@ -109,7 +109,7 @@ export function ClassSidebar() {
     return grouped;
   }, [teacherClasses, studentClasses]);
 
-  const isTeacher = session?.role === "teacher" || session?.role === "school_admin";
+  const isTeacher = session?.role === "teacher" || session?.role === "admin";
 
   // Primary band: icon + color dot only
   if (gradeBand === "primary") {

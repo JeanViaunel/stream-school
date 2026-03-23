@@ -16,7 +16,7 @@ export default function CreateClassPage() {
   // Redirect non-teachers
   if (!session) return null;
 
-  if (session.role !== "teacher" && session.role !== "school_admin") {
+  if (session.role !== "teacher" && session.role !== "admin") {
     return (
       <div className="w-full p-6">
         <Card>

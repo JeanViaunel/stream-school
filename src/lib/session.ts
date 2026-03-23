@@ -10,7 +10,7 @@ export interface Session {
   /** JWT for Convex `ctx.auth` — set on login/register. */
   convexAuthToken?: string;
   organizationId?: string;
-  role?: "student" | "teacher" | "co_teacher" | "parent" | "school_admin" | "platform_admin";
+  role?: "student" | "teacher" | "co_teacher" | "parent" | "admin";
   gradeLevel?: number;
 }
 

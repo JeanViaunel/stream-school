@@ -9,11 +9,11 @@ export const createScheduledSession = mutation({
     title: v.string(),
     description: v.optional(v.string()),
     scheduledAt: v.number(),
-    durationMinutes: v.optional(v.number()),
+    durationMinutes: v.optional(v.number())
   },
   returns: v.object({
     sessionId: v.id("scheduledSessions"),
-    icalUid: v.string(),
+    icalUid: v.string()
   }),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -23,7 +23,9 @@ export const createScheduledSession = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .withIndex("by_username", (q) =>
+        q.eq("username", usernameFromIdentity(identity))
+      )
       .unique();
 
     if (!user) {
@@ -36,35 +38,40 @@ export const createScheduledSession = mutation({
     }
 
     if (cls.teacherId !== user._id) {
-      throw new Error("Only the teacher of this class can create scheduled sessions");
+      throw new Error(
+        "Only the teacher of this class can create scheduled sessions"
+      );
     }
 
     const durationMinutes = args.durationMinutes ?? 60;
     const random = Math.random().toString(36).substring(2, 9);
     const icalUid = `${args.classId}-${args.scheduledAt}-${random}`;
 
-    const sessionId: Id<"scheduledSessions"> = await ctx.db.insert("scheduledSessions", {
-      classId: args.classId,
-      teacherId: user._id,
-      title: args.title,
-      description: args.description,
-      scheduledAt: args.scheduledAt,
-      durationMinutes,
-      icalUid,
-      isArchived: false,
-      createdAt: Date.now(),
-    });
+    const sessionId: Id<"scheduledSessions"> = await ctx.db.insert(
+      "scheduledSessions",
+      {
+        classId: args.classId,
+        teacherId: user._id,
+        title: args.title,
+        description: args.description,
+        scheduledAt: args.scheduledAt,
+        durationMinutes,
+        icalUid,
+        isArchived: false,
+        createdAt: Date.now()
+      }
+    );
 
     return {
       sessionId,
-      icalUid,
+      icalUid
     };
-  },
+  }
 });
 
 export const getUpcoming = query({
   args: {
-    days: v.optional(v.number()),
+    days: v.optional(v.number())
   },
   returns: v.array(
     v.object({
@@ -73,7 +80,7 @@ export const getUpcoming = query({
       className: v.string(),
       title: v.string(),
       scheduledAt: v.number(),
-      durationMinutes: v.number(),
+      durationMinutes: v.number()
     })
   ),
   handler: async (ctx, args) => {
@@ -84,7 +91,9 @@ export const getUpcoming = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .withIndex("by_username", (q) =>
+        q.eq("username", usernameFromIdentity(identity))
+      )
       .unique();
 
     if (!user) {
@@ -97,7 +106,11 @@ export const getUpcoming = query({
 
     const classIds: Id<"classes">[] = [];
 
-    if (user.role === "teacher" || user.role === "school_admin" || user.role === "platform_admin") {
+    if (
+      user.role === "teacher" ||
+      user.role === "co_teacher" ||
+      user.role === "admin"
+    ) {
       const taughtClasses = await ctx.db
         .query("classes")
         .withIndex("by_teacher", (q) => q.eq("teacherId", user._id))
@@ -147,7 +160,7 @@ export const getUpcoming = query({
           className: cls.name,
           title: session.title,
           scheduledAt: session.scheduledAt,
-          durationMinutes: session.durationMinutes,
+          durationMinutes: session.durationMinutes
         });
       }
     }
@@ -155,12 +168,12 @@ export const getUpcoming = query({
     sessions.sort((a, b) => a.scheduledAt - b.scheduledAt);
 
     return sessions;
-  },
+  }
 });
 
 export const deleteScheduledSession = mutation({
   args: {
-    sessionId: v.id("scheduledSessions"),
+    sessionId: v.id("scheduledSessions")
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -171,7 +184,9 @@ export const deleteScheduledSession = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .withIndex("by_username", (q) =>
+        q.eq("username", usernameFromIdentity(identity))
+      )
       .unique();
 
     if (!user) {
@@ -189,17 +204,19 @@ export const deleteScheduledSession = mutation({
     }
 
     if (cls.teacherId !== user._id) {
-      throw new Error("Only the teacher of this class can delete scheduled sessions");
+      throw new Error(
+        "Only the teacher of this class can delete scheduled sessions"
+      );
     }
 
     await ctx.db.patch(args.sessionId, { isArchived: true });
     return null;
-  },
+  }
 });
 
 export const getSessionsByClass = query({
   args: {
-    classId: v.id("classes"),
+    classId: v.id("classes")
   },
   returns: v.array(
     v.object({
@@ -213,7 +230,7 @@ export const getSessionsByClass = query({
       durationMinutes: v.number(),
       icalUid: v.string(),
       isArchived: v.boolean(),
-      createdAt: v.number(),
+      createdAt: v.number()
     })
   ),
   handler: async (ctx, args) => {
@@ -224,7 +241,9 @@ export const getSessionsByClass = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .withIndex("by_username", (q) =>
+        q.eq("username", usernameFromIdentity(identity))
+      )
       .unique();
 
     if (!user) {
@@ -250,18 +269,20 @@ export const getSessionsByClass = query({
 
     const sessions = await ctx.db
       .query("scheduledSessions")
-      .withIndex("by_class_and_scheduled_at", (q) => q.eq("classId", args.classId))
+      .withIndex("by_class_and_scheduled_at", (q) =>
+        q.eq("classId", args.classId)
+      )
       .filter((q) => q.eq(q.field("isArchived"), false))
       .order("asc")
       .collect();
 
     return sessions;
-  },
+  }
 });
 
 export const getSessionById = query({
   args: {
-    sessionId: v.id("scheduledSessions"),
+    sessionId: v.id("scheduledSessions")
   },
   returns: v.union(
     v.object({
@@ -276,13 +297,13 @@ export const getSessionById = query({
         durationMinutes: v.number(),
         icalUid: v.string(),
         isArchived: v.boolean(),
-        createdAt: v.number(),
+        createdAt: v.number()
       }),
       class: v.object({
         _id: v.id("classes"),
         name: v.string(),
-        subject: v.string(),
-      }),
+        subject: v.string()
+      })
     }),
     v.null()
   ),
@@ -294,7 +315,9 @@ export const getSessionById = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .withIndex("by_username", (q) =>
+        q.eq("username", usernameFromIdentity(identity))
+      )
       .unique();
 
     if (!user) {
@@ -328,15 +351,15 @@ export const getSessionById = query({
       class: {
         _id: cls._id,
         name: cls.name,
-        subject: cls.subject,
-      },
+        subject: cls.subject
+      }
     };
-  },
+  }
 });
 
 export const listScheduledSessionsForExport = internalQuery({
   args: {
-    classId: v.id("classes"),
+    classId: v.id("classes")
   },
   returns: v.array(
     v.object({
@@ -350,7 +373,7 @@ export const listScheduledSessionsForExport = internalQuery({
       durationMinutes: v.number(),
       icalUid: v.string(),
       isArchived: v.boolean(),
-      createdAt: v.number(),
+      createdAt: v.number()
     })
   ),
   handler: async (ctx, args) => {
@@ -359,5 +382,5 @@ export const listScheduledSessionsForExport = internalQuery({
       .withIndex("by_class", (q) => q.eq("classId", args.classId))
       .collect();
     return rows.filter((r) => !r.isArchived);
-  },
+  }
 });

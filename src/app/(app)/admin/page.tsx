@@ -26,31 +26,31 @@ export default function AdminPage() {
 
   // Redirect non-admins
   useEffect(() => {
-    if (session && session.role !== "school_admin" && session.role !== "platform_admin") {
+    if (session && session.role !== "admin") {
       router.push("/dashboard");
     }
   }, [session, router]);
 
   const users = useQuery(
     api.admin.getAllUsers,
-    session?.role === "school_admin" || session?.role === "platform_admin" ? {} : "skip"
+    session?.role === "admin" ? {} : "skip"
   );
 
   const classes = useQuery(
     api.admin.getAllClasses,
-    session?.role === "school_admin" || session?.role === "platform_admin" ? {} : "skip"
+    session?.role === "admin" ? {} : "skip"
   );
 
   const stats = useQuery(
     api.admin.getDashboardStats,
-    session?.role === "school_admin" || session?.role === "platform_admin" ? {} : "skip"
+    session?.role === "admin" ? {} : "skip"
   );
 
   if (!session) {
     return null;
   }
 
-  if (session.role !== "school_admin" && session.role !== "platform_admin") {
+  if (session.role !== "admin") {
     return (
       <div className="w-full px-4 md:px-6 py-6">
         <Card>

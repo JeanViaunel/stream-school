@@ -15,11 +15,7 @@ export default function AdminAuditLogPage() {
   const { session } = useAuth();
 
   useEffect(() => {
-    if (
-      session &&
-      session.role !== "school_admin" &&
-      session.role !== "platform_admin"
-    ) {
+    if (session && session.role !== "admin") {
       router.push("/dashboard");
     }
   }, [session, router]);
@@ -28,7 +24,7 @@ export default function AdminAuditLogPage() {
     return null;
   }
 
-  if (session.role !== "school_admin" && session.role !== "platform_admin") {
+  if (session.role !== "admin") {
     return (
       <div className="container mx-auto p-6">
         <Card>

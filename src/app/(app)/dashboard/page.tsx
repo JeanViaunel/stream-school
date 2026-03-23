@@ -34,7 +34,7 @@ export default function DashboardPage() {
   
   const teacherClasses = useQuery(
     api.classes.getClassesByTeacher,
-    session?.role === "teacher" || session?.role === "school_admin" ? {} : "skip"
+    session?.role === "teacher" || session?.role === "admin" ? {} : "skip"
   );
   
   const studentClasses = useQuery(

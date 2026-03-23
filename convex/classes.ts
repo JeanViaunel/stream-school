@@ -34,7 +34,7 @@ export const createClass = action({
       throw new Error("User not found");
     }
 
-    if (!user.role || (user.role !== "teacher" && user.role !== "school_admin" && user.role !== "platform_admin")) {
+    if (!user.role || (user.role !== "teacher" && user.role !== "admin")) {
       throw new Error("Only teachers can create classes");
     }
 
@@ -410,7 +410,7 @@ export const archiveClass = mutation({
       throw new Error("Class not found");
     }
 
-    if (cls.teacherId !== user._id && user.role !== "school_admin" && user.role !== "platform_admin") {
+    if (cls.teacherId !== user._id && user.role !== "admin") {
       throw new Error("Only the teacher or an admin can archive a class");
     }
 

@@ -18,12 +18,12 @@ export default function AdminClassesPage() {
 
   // Redirect non-admins
   useEffect(() => {
-    if (session && session.role !== "school_admin" && session.role !== "platform_admin") {
+    if (session && session.role !== "admin") {
       router.push("/dashboard");
     }
   }, [session, router]);
 
-  const isAdmin = session?.role === "school_admin" || session?.role === "platform_admin";
+  const isAdmin = session?.role === "admin";
 
   const classes = useQuery(
     api.admin.getAllClasses,

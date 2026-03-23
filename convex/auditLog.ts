@@ -19,7 +19,7 @@ async function requireAdminOrg(ctx: QueryCtx): Promise<{
   if (!user || !user.organizationId) {
     throw new Error("User not found");
   }
-  if (user.role !== "school_admin" && user.role !== "platform_admin") {
+  if (user.role !== "admin") {
     throw new Error("Only admins can view audit logs");
   }
   return { userId: user._id, orgId: user.organizationId };

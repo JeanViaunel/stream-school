@@ -190,14 +190,14 @@ export function Sidebar() {
   // Fetch classes
   const teacherClasses = useQuery(
     api.classes.getClassesByTeacher,
-    session?.role === "teacher" || session?.role === "school_admin" ? {} : "skip"
+    session?.role === "teacher" || session?.role === "admin" ? {} : "skip"
   );
   const studentClasses = useQuery(
     api.classes.getClassesByStudent,
     session?.role === "student" ? {} : "skip"
   );
   const classes = teacherClasses || studentClasses || [];
-  const isTeacher = session?.role === "teacher" || session?.role === "school_admin";
+  const isTeacher = session?.role === "teacher" || session?.role === "admin";
 
   // Handlers
   async function handleLogout() {
@@ -395,7 +395,7 @@ export function Sidebar() {
               </Link>
             )}
 
-            {(session?.role === "school_admin" || session?.role === "platform_admin") && (
+            {(session?.role === "admin") && (
               <Link href="/admin">
                 <div className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer",

@@ -57,7 +57,7 @@ export function ClassHeader({
   const { gradeBand } = useGradeSkin();
   
   const isTeacher = session?.userId === classData.teacherId;
-  const isAdmin = session?.role === "school_admin" || session?.role === "platform_admin";
+  const isAdmin = session?.role === "admin";
 
   // Primary band: simplified header
   if (gradeBand === "primary") {

@@ -48,8 +48,7 @@ async function isTeacherOrAdmin(ctx: QueryCtx): Promise<boolean> {
 
   return (
     user?.role === "teacher" ||
-    user?.role === "school_admin" ||
-    user?.role === "platform_admin"
+    user?.role === "admin"
   );
 }
 

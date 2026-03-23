@@ -44,8 +44,7 @@ export default function AdminUsersPage() {
     "teacher",
     "co_teacher",
     "parent",
-    "school_admin",
-    "platform_admin",
+    "admin",
   ] as const;
   type UserRole = (typeof ALL_ROLES)[number];
 
@@ -67,14 +66,14 @@ export default function AdminUsersPage() {
 
   // Redirect non-admins
   useEffect(() => {
-    if (session && session.role !== "school_admin" && session.role !== "platform_admin") {
+    if (session && session.role !== "admin") {
       router.push("/dashboard");
     }
   }, [session, router]);
 
   const users = useQuery(
     api.admin.getAllUsers,
-    session?.role === "school_admin" || session?.role === "platform_admin" ? {} : "skip"
+    session?.role === "admin" ? {} : "skip"
   );
 
   const inviteUser = useAction(api.admin.inviteUser);
@@ -134,15 +133,14 @@ export default function AdminUsersPage() {
       case "teacher": return "bg-green-500/20 text-green-500";
       case "co_teacher": return "bg-teal-500/20 text-teal-500";
       case "parent": return "bg-purple-500/20 text-purple-500";
-      case "school_admin": return "bg-red-500/20 text-red-500";
-      case "platform_admin": return "bg-red-500/20 text-red-500";
+      case "admin": return "bg-red-500/20 text-red-500";
       default: return "bg-gray-500/20 text-gray-500";
     }
   };
 
   const getRoleLabel = (role?: string) => {
     if (!role) return "-";
-    if (role === "school_admin" || role === "platform_admin") return "Admin";
+    if (role === "admin") return "Admin";
     if (role === "co_teacher") return "Co-teacher";
     return role;
   };
@@ -180,7 +178,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  if (!session || (session.role !== "school_admin" && session.role !== "platform_admin")) {
+  if (!session || (session.role !== "admin")) {
     return null;
   }
 
@@ -244,9 +242,7 @@ export default function AdminUsersPage() {
                             ? "Co-teacher"
                             : role === "parent"
                             ? "Parent"
-                            : role === "school_admin"
-                            ? "Admin"
-                            : "Platform Admin"}
+                            : "Admin"}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -366,9 +362,7 @@ export default function AdminUsersPage() {
                                     ? "Co-teacher"
                                     : role === "parent"
                                     ? "Parent"
-                                    : role === "school_admin"
-                                    ? "Admin"
-                                    : "Platform Admin"}
+                                    : "Admin"}
                                 </SelectItem>
                               ))}
                             </SelectContent>

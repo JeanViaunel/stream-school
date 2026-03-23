@@ -30,8 +30,7 @@ export function ClassroomTabs({ classId, teacherId, chatPanel }: ClassroomTabsPr
 
   const isTeacherOrAdmin =
     session?.userId === teacherId ||
-    session?.role === "school_admin" ||
-    session?.role === "platform_admin";
+    session?.role === "admin";
 
   if (!session) {
     return null;

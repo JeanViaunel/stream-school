@@ -1,20 +1,30 @@
-import { action, internalMutation, mutation, query } from "./_generated/server";
+import { action, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { usernameFromIdentity } from "./authHelpers";
 
-// Helper to check if user is admin
-async function isAdmin(ctx: any) {
+async function requireAdmin(
+  ctx: any,
+  operationErrorMessage: string,
+): Promise<{ adminUser: any; orgId: Id<"organizations"> }> {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity) return false;
-  
-  const user = await ctx.db
+  if (!identity) throw new Error(operationErrorMessage);
+
+  const adminUser = await ctx.db
     .query("users")
-    .withIndex("by_username", (q: any) => q.eq("username", usernameFromIdentity(identity)))
+    .withIndex(
+      "by_username",
+      (q: any) => q.eq("username", usernameFromIdentity(identity)),
+    )
     .unique();
-    
-  return user?.role === "school_admin" || user?.role === "platform_admin";
+
+  const isAdminRole = adminUser?.role === "admin";
+
+  if (!adminUser || !isAdminRole) throw new Error(operationErrorMessage);
+  if (!adminUser.organizationId) throw new Error("Admin user not found");
+
+  return { adminUser, orgId: adminUser.organizationId };
 }
 
 type InviteResult = { success: boolean; userId?: Id<"users"> };
@@ -29,18 +39,13 @@ export const inviteUser = action({
       v.literal("teacher"),
       v.literal("co_teacher"),
       v.literal("parent"),
-      v.literal("school_admin"),
-      v.literal("platform_admin")
+      v.literal("admin")
     ),
     gradeLevel: v.optional(v.number()),
     email: v.optional(v.string()),
   },
   returns: v.object({ success: v.boolean(), userId: v.optional(v.id("users")) }),
   handler: async (ctx, args): Promise<InviteResult> => {
-    if (!(await isAdmin(ctx))) {
-      throw new Error("Only admins can invite users");
-    }
-
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
@@ -48,7 +53,11 @@ export const inviteUser = action({
       username: usernameFromIdentity(identity),
     });
 
-    if (!adminUser || !adminUser.organizationId) throw new Error("Admin user not found");
+    if (!adminUser) throw new Error("Only admins can invite users");
+    if (adminUser.role !== "admin") {
+      throw new Error("Only admins can invite users");
+    }
+    if (!adminUser.organizationId) throw new Error("Admin user not found");
 
     // Check if username already exists
     const existing = await ctx.runQuery(
@@ -96,40 +105,6 @@ export const inviteUser = action({
   },
 });
 
-// Internal mutation to insert invited user
-export const insertInvitedUser = internalMutation({
-  args: {
-    username: v.string(),
-    passwordHash: v.string(),
-    streamUserId: v.string(),
-    displayName: v.string(),
-    role: v.union(
-      v.literal("student"),
-      v.literal("teacher"),
-      v.literal("co_teacher"),
-      v.literal("parent"),
-      v.literal("school_admin"),
-      v.literal("platform_admin")
-    ),
-    organizationId: v.id("organizations"),
-    gradeLevel: v.optional(v.number()),
-  },
-  returns: v.id("users"),
-  handler: async (ctx, args) => {
-    return await ctx.db.insert("users", {
-      username: args.username,
-      passwordHash: args.passwordHash,
-      streamUserId: args.streamUserId,
-      displayName: args.displayName,
-      createdAt: Date.now(),
-      role: args.role,
-      organizationId: args.organizationId,
-      gradeLevel: args.gradeLevel,
-      isActive: false,
-    });
-  },
-});
-
 // Get all classes in the organization
 export const getAllClasses = query({
   args: {},
@@ -151,21 +126,10 @@ export const getAllClasses = query({
     })
   ),
   handler: async (ctx) => {
-    if (!(await isAdmin(ctx))) {
-      throw new Error("Only admins can view all classes");
-    }
-
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const adminUser = await ctx.db
-      .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
-      .unique();
-
-    if (!adminUser || !adminUser.organizationId) throw new Error("Admin user not found");
-
-    const orgId = adminUser.organizationId;
+    const { orgId } = await requireAdmin(
+      ctx,
+      "Only admins can view all classes",
+    );
     const classes = await ctx.db
       .query("classes")
       .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
@@ -210,15 +174,9 @@ export const getAllUsers = query({
     })
   ),
   handler: async (ctx) => {
-    if (!(await isAdmin(ctx))) {
-      throw new Error("Only admins can view all users");
-    }
+    // Admins can view ALL users (across organizations).
+    await requireAdmin(ctx, "Only admins can view all users");
 
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    // Admins should be able to view ALL users, not only those in their org.
-    // (We still require the requester's identity to be an admin.)
     const users = await ctx.db.query("users").collect();
 
     return users.map((u) => ({
@@ -246,37 +204,20 @@ export const getDashboardStats = query({
     activeClasses: v.number(),
   }),
   handler: async (ctx) => {
-    if (!(await isAdmin(ctx))) {
-      throw new Error("Only admins can view dashboard stats");
-    }
+    const { orgId } = await requireAdmin(
+      ctx,
+      "Only admins can view dashboard stats",
+    );
 
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const adminUser = await ctx.db
+    const users = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
-      .unique();
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+      .collect();
 
-    if (!adminUser) throw new Error("Admin user not found");
-
-    // Unify admin behavior: both admin roles should follow the same data scope rules.
-    // If an admin has an org, scope to that org; otherwise fall back to global.
-    const orgId = adminUser.organizationId;
-
-    const users = orgId
-      ? await ctx.db
-          .query("users")
-          .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-          .collect()
-      : await ctx.db.query("users").collect();
-
-    const classes = orgId
-      ? await ctx.db
-          .query("classes")
-          .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-          .collect()
-      : await ctx.db.query("classes").collect();
+    const classes = await ctx.db
+      .query("classes")
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+      .collect();
 
     const totalUsers = users.length;
     const activeUsers = users.filter((u) => !!u.isActive).length;
@@ -305,24 +246,15 @@ export const updateUserRole = mutation({
       v.literal("teacher"),
       v.literal("co_teacher"),
       v.literal("parent"),
-      v.literal("school_admin"),
-      v.literal("platform_admin")
+      v.literal("admin")
     ),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (!(await isAdmin(ctx))) {
-      throw new Error("Only admins can update user roles");
-    }
-
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const adminUser = await ctx.db
-      .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
-      .unique();
-    if (!adminUser?.organizationId) throw new Error("Admin user not found");
+    const { adminUser, orgId } = await requireAdmin(
+      ctx,
+      "Only admins can update user roles",
+    );
 
     if (args.userId === adminUser._id) {
       throw new Error("You cannot change your own role");
@@ -331,16 +263,15 @@ export const updateUserRole = mutation({
     const targetUser = await ctx.db.get(args.userId);
     if (!targetUser) throw new Error("User not found");
 
-    // Keep admin operations scoped to the same organization.
-    if (targetUser.organizationId !== adminUser.organizationId) {
-      throw new Error("User not found");
-    }
-
     const fromRole = targetUser.role ?? null;
     await ctx.db.patch(args.userId, { role: args.role });
 
+    const auditOrgId = targetUser.organizationId ?? orgId;
+    // `organizationId` is required by auditLogs schema; `orgId` comes from requireAdmin.
+    if (!auditOrgId) throw new Error("Admin user not found");
+
     await ctx.runMutation(internal.auditLog.logAction, {
-      organizationId: adminUser.organizationId,
+      organizationId: auditOrgId,
       actorId: adminUser._id,
       action: "user_role_updated",
       targetId: args.userId,
@@ -357,24 +288,21 @@ export const deactivateUser = mutation({
   args: { userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (!(await isAdmin(ctx))) {
-      throw new Error("Only admins can deactivate users");
-    }
+    const { adminUser, orgId } = await requireAdmin(
+      ctx,
+      "Only admins can deactivate users",
+    );
 
     const user = await ctx.db.get(args.userId);
     if (!user) throw new Error("User not found");
 
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-    const adminUser = await ctx.db
-      .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
-      .unique();
-    if (!adminUser?.organizationId) throw new Error("Admin user not found");
-
     await ctx.db.patch(args.userId, { isActive: false });
+
+    const auditOrgId = user.organizationId ?? orgId;
+    if (!auditOrgId) throw new Error("Admin user not found");
+
     await ctx.runMutation(internal.auditLog.logAction, {
-      organizationId: adminUser.organizationId,
+      organizationId: auditOrgId,
       actorId: adminUser._id,
       action: "user_deactivated",
       targetId: args.userId,
@@ -389,24 +317,21 @@ export const reactivateUser = mutation({
   args: { userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (!(await isAdmin(ctx))) {
-      throw new Error("Only admins can reactivate users");
-    }
+    const { adminUser, orgId } = await requireAdmin(
+      ctx,
+      "Only admins can reactivate users",
+    );
 
     const user = await ctx.db.get(args.userId);
     if (!user) throw new Error("User not found");
 
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-    const adminUser = await ctx.db
-      .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
-      .unique();
-    if (!adminUser?.organizationId) throw new Error("Admin user not found");
-
     await ctx.db.patch(args.userId, { isActive: true });
+
+    const auditOrgId = user.organizationId ?? orgId;
+    if (!auditOrgId) throw new Error("Admin user not found");
+
     await ctx.runMutation(internal.auditLog.logAction, {
-      organizationId: adminUser.organizationId,
+      organizationId: auditOrgId,
       actorId: adminUser._id,
       action: "user_reactivated",
       targetId: args.userId,

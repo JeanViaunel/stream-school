@@ -26,7 +26,7 @@ export const createPoll = mutation({
       throw new Error("User not found");
     }
 
-    if (!user.role || (user.role !== "teacher" && user.role !== "school_admin" && user.role !== "platform_admin")) {
+    if (!user.role || (user.role !== "teacher" && user.role !== "admin")) {
       throw new Error("Only teachers can create polls");
     }
 
@@ -85,7 +85,7 @@ export const closePoll = mutation({
 
     const isCreator = poll.creatorId === user._id;
     const isClassTeacher = cls.teacherId === user._id;
-    const isAdmin = user.role === "school_admin" || user.role === "platform_admin";
+    const isAdmin = user.role === "admin";
 
     if (!isCreator && !isClassTeacher && !isAdmin) {
       throw new Error("Only the creator, class teacher, or admin can close a poll");
@@ -208,9 +208,7 @@ export const getPollResults = query({
       throw new Error("Class not found");
     }
 
-    const isTeacher = cls.teacherId === user._id || 
-                      user.role === "school_admin" || 
-                      user.role === "platform_admin";
+    const isTeacher = cls.teacherId === user._id || user.role === "admin";
     
     let isEnrolledStudent = false;
     if (!isTeacher) {
@@ -305,9 +303,7 @@ export const getPollsBySession = query({
       throw new Error("Class not found");
     }
 
-    const isTeacher = cls.teacherId === user._id || 
-                      user.role === "school_admin" || 
-                      user.role === "platform_admin";
+    const isTeacher = cls.teacherId === user._id || user.role === "admin";
     
     let isEnrolledStudent = false;
     if (!isTeacher) {

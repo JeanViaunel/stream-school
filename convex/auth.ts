@@ -9,8 +9,7 @@ const userRoleReturn = v.union(
   v.literal("teacher"),
   v.literal("co_teacher"),
   v.literal("parent"),
-  v.literal("school_admin"),
-  v.literal("platform_admin")
+  v.literal("admin")
 );
 
 type AuthResult = {
@@ -20,7 +19,7 @@ type AuthResult = {
   token: string;
   /** RS256 JWT for Convex `ctx.auth` (not the Stream token). */
   convexAuthToken: string;
-  role: "student" | "teacher" | "co_teacher" | "parent" | "school_admin" | "platform_admin";
+  role: "student" | "teacher" | "co_teacher" | "parent" | "admin";
   organizationId: Id<"organizations"> | undefined;
   gradeLevel: number | undefined;
 };
@@ -141,7 +140,7 @@ export const login = action({
 
     const role =
       user.role ??
-      ("student" as "student" | "teacher" | "co_teacher" | "parent" | "school_admin" | "platform_admin");
+      ("student" as "student" | "teacher" | "co_teacher" | "parent" | "admin");
 
     const convexAuthToken: string = await ctx.runAction(internal.convexJwt.signConvexAuthToken, {
       username: user.username,

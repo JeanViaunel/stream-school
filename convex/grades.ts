@@ -38,7 +38,7 @@ export const recordGrade = mutation({
       throw new Error("Class not found");
     }
 
-    if (cls.teacherId !== user._id && assignment.creatorId !== user._id && user.role !== "school_admin" && user.role !== "platform_admin") {
+    if (cls.teacherId !== user._id && assignment.creatorId !== user._id && user.role !== "admin") {
       throw new Error("Only the teacher or an admin can record grades");
     }
 
@@ -117,7 +117,7 @@ export const getGradebookByClass = query({
       throw new Error("Class not found");
     }
 
-    if (cls.teacherId !== user._id && user.role !== "school_admin" && user.role !== "platform_admin") {
+    if (cls.teacherId !== user._id && user.role !== "admin") {
       throw new Error("Only the teacher or an admin can view the gradebook");
     }
 
@@ -392,7 +392,7 @@ export const getClassAverage = query({
     }
 
     const isTeacher = cls.teacherId === user._id;
-    const isAdmin = user.role === "school_admin" || user.role === "platform_admin";
+    const isAdmin = user.role === "admin";
     const isEnrolled = await ctx.db
       .query("enrollments")
       .withIndex("by_class_and_student", (q) =>

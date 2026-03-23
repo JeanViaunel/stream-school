@@ -1,13 +1,13 @@
-import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+// import { internal } from "./_generated/api";
+// import type { Id } from "./_generated/dataModel";
 import { usernameFromIdentity } from "./authHelpers";
 
 export const createLink = mutation({
   args: {
     studentId: v.id("users"),
-    parentEmail: v.string(),
+    parentEmail: v.string()
   },
   returns: v.id("parentLinks"),
   handler: async (ctx, args) => {
@@ -18,7 +18,9 @@ export const createLink = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .withIndex("by_username", (q) =>
+        q.eq("username", usernameFromIdentity(identity))
+      )
       .unique();
 
     if (!user) {
@@ -50,17 +52,17 @@ export const createLink = mutation({
       studentId: args.studentId,
       linkedAt: Date.now(),
       consentGiven: false,
-      consentMethod: "pending",
+      consentMethod: "pending"
     });
 
     return linkId;
-  },
+  }
 });
 
 export const acceptLink = mutation({
   args: {
     linkId: v.id("parentLinks"),
-    consentMethod: v.string(),
+    consentMethod: v.string()
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -71,11 +73,11 @@ export const acceptLink = mutation({
 
     await ctx.db.patch(args.linkId, {
       consentGiven: true,
-      consentMethod: args.consentMethod,
+      consentMethod: args.consentMethod
     });
 
     return null;
-  },
+  }
 });
 
 export const getLinksByParent = query({
@@ -88,7 +90,7 @@ export const getLinksByParent = query({
       studentId: v.id("users"),
       linkedAt: v.number(),
       consentGiven: v.boolean(),
-      consentMethod: v.string(),
+      consentMethod: v.string()
     })
   ),
   handler: async (ctx) => {
@@ -99,7 +101,9 @@ export const getLinksByParent = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .withIndex("by_username", (q) =>
+        q.eq("username", usernameFromIdentity(identity))
+      )
       .unique();
 
     if (!user) {
@@ -110,7 +114,7 @@ export const getLinksByParent = query({
       .query("parentLinks")
       .withIndex("by_parent", (q) => q.eq("parentId", user._id))
       .collect();
-  },
+  }
 });
 
 export const getLinksByStudent = query({
@@ -123,7 +127,7 @@ export const getLinksByStudent = query({
       studentId: v.id("users"),
       linkedAt: v.number(),
       consentGiven: v.boolean(),
-      consentMethod: v.string(),
+      consentMethod: v.string()
     })
   ),
   handler: async (ctx, args) => {
@@ -134,14 +138,16 @@ export const getLinksByStudent = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .withIndex("by_username", (q) =>
+        q.eq("username", usernameFromIdentity(identity))
+      )
       .unique();
 
     if (!user) {
       throw new Error("User not found");
     }
 
-    if (user.role !== "school_admin" && user.role !== "platform_admin") {
+    if (user.role !== "admin") {
       throw new Error("Only admins can view all parent links for a student");
     }
 
@@ -149,5 +155,5 @@ export const getLinksByStudent = query({
       .query("parentLinks")
       .withIndex("by_student", (q) => q.eq("studentId", args.studentId))
       .collect();
-  },
+  }
 });

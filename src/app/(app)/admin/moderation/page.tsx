@@ -14,7 +14,7 @@ export default function AdminModerationPage() {
 
   // Redirect non-admins
   useEffect(() => {
-    if (session && session.role !== "school_admin" && session.role !== "platform_admin" && session.role !== "teacher") {
+    if (session && session.role !== "admin" && session.role !== "teacher") {
       router.push("/dashboard");
     }
   }, [session, router]);
@@ -23,7 +23,7 @@ export default function AdminModerationPage() {
     return null;
   }
 
-  if (session.role !== "school_admin" && session.role !== "platform_admin" && session.role !== "teacher") {
+  if (session.role !== "admin" && session.role !== "teacher") {
     return (
       <div className="container mx-auto p-6">
         <p className="text-muted-foreground">Redirecting...</p>
