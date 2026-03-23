@@ -123,8 +123,12 @@ function ClassCallRoomInner({
 
     const terminated = !!call?.state.endedAt;
     setWasTerminated(terminated);
+    if (terminated && !isTeacher) {
+      onLeave();
+      return;
+    }
     setShowEnded(true);
-  }, [callingState, call?.state.endedAt, camera, microphone]);
+  }, [callingState, call?.state.endedAt, camera, microphone, isTeacher, onLeave]);
 
   if (showEnded) {
     return (
