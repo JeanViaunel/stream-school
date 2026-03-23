@@ -8,8 +8,16 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
+import type * as assignments from "../assignments.js";
 import type * as auth from "../auth.js";
+import type * as classes from "../classes.js";
+import type * as organizations from "../organizations.js";
+import type * as parentLinks from "../parentLinks.js";
+import type * as polls from "../polls.js";
+import type * as sessions from "../sessions.js";
 import type * as stream from "../stream.js";
+import type * as submissions from "../submissions.js";
 import type * as users from "../users.js";
 
 import type {
@@ -19,8 +27,16 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
+  assignments: typeof assignments;
   auth: typeof auth;
+  classes: typeof classes;
+  organizations: typeof organizations;
+  parentLinks: typeof parentLinks;
+  polls: typeof polls;
+  sessions: typeof sessions;
   stream: typeof stream;
+  submissions: typeof submissions;
   users: typeof users;
 }>;
 

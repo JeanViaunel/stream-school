@@ -1,5 +1,5 @@
 import { action, query, type ActionCtx, type QueryCtx } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { type Id } from "./_generated/dataModel";
 import bcrypt from "bcryptjs";
@@ -16,6 +16,16 @@ export const register = action({
     username: v.string(),
     password: v.string(),
     displayName: v.string(),
+    role: v.optional(v.union(
+      v.literal("student"),
+      v.literal("teacher"),
+      v.literal("co_teacher"),
+      v.literal("parent"),
+      v.literal("school_admin"),
+      v.literal("platform_admin")
+    )),
+    organizationId: v.optional(v.id("organizations")),
+    gradeLevel: v.optional(v.number()),
   },
   returns: v.object({
     userId: v.id("users"),
@@ -25,16 +35,22 @@ export const register = action({
   }),
   handler: async (
     ctx: ActionCtx,
-    args: { username: string; password: string; displayName: string }
+    args: { username: string; password: string; displayName: string; role?: string; organizationId?: Id<"organizations">; gradeLevel?: number }
   ): Promise<AuthResult> => {
     const passwordHash: string = await bcrypt.hash(args.password, 10);
     const streamUserId: string = `user_${args.username}`;
 
+    const role = (args.role ?? "student") as "student" | "teacher" | "co_teacher" | "parent" | "school_admin" | "platform_admin";
+    
     const userId: Id<"users"> = await ctx.runMutation(internal.users.createUser, {
       username: args.username,
       passwordHash,
       displayName: args.displayName,
       streamUserId,
+      role,
+      organizationId: args.organizationId ?? (await getDefaultOrgId(ctx)),
+      gradeLevel: args.gradeLevel,
+      isActive: true,
     });
     const token: string = await ctx.runAction(internal.stream.generateToken, {
       userId: streamUserId,
@@ -48,6 +64,24 @@ export const register = action({
     return { userId, displayName: args.displayName, streamUserId, token };
   },
 });
+
+async function getDefaultOrgId(ctx: ActionCtx): Promise<Id<"organizations">> {
+  const org = await ctx.runQuery(api.organizations.getBySlug, { slug: "default" });
+  if (org) {
+    return org._id;
+  }
+  return await ctx.runMutation(internal.organizations.createOrganization, {
+    name: "Default Organization",
+    slug: "default",
+    settings: {
+      studentDmsEnabled: false,
+      recordingEnabled: false,
+      lobbyEnabled: true,
+      maxClassSize: 30,
+      dataRetentionDays: 365,
+    },
+  });
+}
 
 export const login = action({
   args: {

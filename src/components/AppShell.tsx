@@ -3,6 +3,8 @@
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { OrgProvider } from "@/contexts/OrgContext";
+import { GradeSkinProvider } from "@/contexts/GradeSkinContext";
 import { StreamContext } from "@/contexts/StreamContext";
 import { UIActionsProvider } from "@/contexts/UIActionsContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
@@ -58,12 +60,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <SettingsProvider>
       <UIActionsProvider>
-        <StreamContext>
-          <CommandPalette />
-          <IncomingCallModal />
-          <NotificationManager />
-          {children}
-        </StreamContext>
+        <OrgProvider>
+          <GradeSkinProvider>
+            <StreamContext>
+              <CommandPalette />
+              <IncomingCallModal />
+              <NotificationManager />
+              {children}
+            </StreamContext>
+          </GradeSkinProvider>
+        </OrgProvider>
       </UIActionsProvider>
     </SettingsProvider>
   );

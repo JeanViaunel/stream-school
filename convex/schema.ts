@@ -8,5 +8,153 @@ export default defineSchema({
     streamUserId: v.string(),
     displayName: v.string(),
     createdAt: v.number(),
-  }).index("by_username", ["username"]),
+    role: v.optional(v.union(
+      v.literal("student"),
+      v.literal("teacher"),
+      v.literal("co_teacher"),
+      v.literal("parent"),
+      v.literal("school_admin"),
+      v.literal("platform_admin")
+    )),
+    organizationId: v.optional(v.id("organizations")),
+    gradeLevel: v.optional(v.number()),
+    avatarUrl: v.optional(v.string()),
+    parentConsentGiven: v.optional(v.boolean()),
+    parentConsentAt: v.optional(v.number()),
+    isActive: v.optional(v.boolean()),
+    lastSeenAt: v.optional(v.number()),
+  })
+    .index("by_username", ["username"])
+    .index("by_organization", ["organizationId"])
+    .index("by_role_and_organization", ["role", "organizationId"]),
+
+  organizations: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    logoUrl: v.optional(v.string()),
+    primaryColor: v.optional(v.string()),
+    createdAt: v.number(),
+    settings: v.object({
+      studentDmsEnabled: v.boolean(),
+      recordingEnabled: v.boolean(),
+      lobbyEnabled: v.boolean(),
+      maxClassSize: v.number(),
+      dataRetentionDays: v.number(),
+    }),
+  }).index("by_slug", ["slug"]),
+
+  classes: defineTable({
+    organizationId: v.id("organizations"),
+    teacherId: v.id("users"),
+    name: v.string(),
+    subject: v.string(),
+    gradeLevel: v.number(),
+    streamChannelId: v.string(),
+    joinCode: v.string(),
+    isArchived: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_organization", ["organizationId"])
+    .index("by_teacher", ["teacherId"])
+    .index("by_join_code", ["joinCode"]),
+
+  enrollments: defineTable({
+    classId: v.id("classes"),
+    studentId: v.id("users"),
+    enrolledAt: v.number(),
+    status: v.union(v.literal("active"), v.literal("removed")),
+  })
+    .index("by_class", ["classId"])
+    .index("by_student", ["studentId"])
+    .index("by_class_and_student", ["classId", "studentId"]),
+
+  parentLinks: defineTable({
+    parentId: v.id("users"),
+    studentId: v.id("users"),
+    linkedAt: v.number(),
+    consentGiven: v.boolean(),
+    consentMethod: v.string(),
+  })
+    .index("by_parent", ["parentId"])
+    .index("by_student", ["studentId"])
+    .index("by_parent_and_student", ["parentId", "studentId"]),
+
+  sessions: defineTable({
+    classId: v.id("classes"),
+    hostId: v.id("users"),
+    streamCallId: v.string(),
+    scheduledAt: v.optional(v.number()),
+    startedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    recordingUrl: v.optional(v.string()),
+    recordingConsentRequired: v.boolean(),
+  })
+    .index("by_class", ["classId"])
+    .index("by_class_and_started_at", ["classId", "startedAt"]),
+
+  sessionLogs: defineTable({
+    sessionId: v.id("sessions"),
+    userId: v.id("users"),
+    joinedAt: v.number(),
+    leftAt: v.optional(v.number()),
+    wasAdmittedFromLobby: v.boolean(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_user", ["userId"]),
+
+  assignments: defineTable({
+    classId: v.id("classes"),
+    creatorId: v.id("users"),
+    title: v.string(),
+    instructions: v.string(),
+    type: v.union(v.literal("multiple_choice"), v.literal("short_answer")),
+    questions: v.array(v.object({
+      id: v.string(),
+      text: v.string(),
+      options: v.optional(v.array(v.string())),
+      correctOption: v.optional(v.number()),
+    })),
+    dueDateAt: v.optional(v.number()),
+    sessionId: v.optional(v.id("sessions")),
+    isPublished: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_class", ["classId"])
+    .index("by_session", ["sessionId"]),
+
+  submissions: defineTable({
+    assignmentId: v.id("assignments"),
+    studentId: v.id("users"),
+    answers: v.array(v.object({
+      questionId: v.string(),
+      value: v.string(),
+    })),
+    submittedAt: v.number(),
+    autoScore: v.optional(v.number()),
+    teacherScore: v.optional(v.number()),
+    teacherFeedback: v.optional(v.string()),
+  })
+    .index("by_assignment", ["assignmentId"])
+    .index("by_student", ["studentId"])
+    .index("by_assignment_and_student", ["assignmentId", "studentId"]),
+
+  polls: defineTable({
+    sessionId: v.id("sessions"),
+    classId: v.id("classes"),
+    creatorId: v.id("users"),
+    question: v.string(),
+    options: v.array(v.string()),
+    isOpen: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_session", ["sessionId"]),
+
+  pollResponses: defineTable({
+    pollId: v.id("polls"),
+    studentId: v.id("users"),
+    selectedOption: v.number(),
+    respondedAt: v.number(),
+  })
+    .index("by_poll", ["pollId"])
+    .index("by_poll_and_student", ["pollId", "studentId"]),
 });

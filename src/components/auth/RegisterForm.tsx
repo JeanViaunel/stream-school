@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FormField } from "./FormField";
 import { PasswordInput } from "./PasswordInput";
 import { toast } from "sonner";
@@ -20,8 +21,13 @@ import {
   CheckCircle2,
   Sparkles,
   Loader2,
-  Check
+  Check,
+  Calendar,
+  GraduationCap,
+  Users,
+  Building
 } from "lucide-react";
+import { differenceInYears, parseISO } from "date-fns";
 
 // Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -35,8 +41,11 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+type UserRole = "student" | "teacher" | "parent";
+
 export function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { session, login } = useAuth();
 
   useEffect(() => {
@@ -47,6 +56,10 @@ export function RegisterForm() {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<UserRole>("student");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [gradeLevel, setGradeLevel] = useState<number | null>(null);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -64,6 +77,19 @@ export function RegisterForm() {
     const timer = setTimeout(() => setIsMounted(true), 300);
     return () => clearTimeout(timer);
   }, []);
+
+  // Resolve organization from subdomain or query param
+  useEffect(() => {
+    const resolveOrg = async () => {
+      const orgSlug = searchParams.get("org") || getSubdomain();
+      if (orgSlug) {
+        // In a real implementation, you'd fetch the org by slug
+        // For now, we'll use the default org
+        console.log("Resolving organization:", orgSlug);
+      }
+    };
+    resolveOrg();
+  }, [searchParams]);
 
   // Check username availability
   useEffect(() => {
@@ -84,6 +110,9 @@ export function RegisterForm() {
     return () => clearTimeout(timer);
   }, [debouncedUsername]);
 
+  const age = dateOfBirth ? differenceInYears(new Date(), new Date(dateOfBirth)) : null;
+  const requiresParentalConsent = age !== null && age < 13;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -101,10 +130,41 @@ export function RegisterForm() {
       return;
     }
 
+    if (role === "student" && !dateOfBirth) {
+      setError("Date of birth is required for students");
+      toast.error("Date of birth is required for students");
+      return;
+    }
+
+    if (role === "student" && !gradeLevel) {
+      setError("Grade level is required for students");
+      toast.error("Grade level is required for students");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const result = await registerAction({ username, password, displayName });
+      const result = await registerAction({ 
+        username, 
+        password, 
+        displayName,
+        role,
+        gradeLevel: gradeLevel ?? undefined,
+      });
+
+      if (requiresParentalConsent) {
+        // Store pending user info for consent flow
+        sessionStorage.setItem("pendingUserId", result.userId);
+        sessionStorage.setItem("pendingConsentEmail", "");
+        
+        toast.info("Parental consent required", {
+          description: "Redirecting to consent form...",
+        });
+        
+        router.push("/consent");
+        return;
+      }
 
       // Show success state with confetti
       setIsSuccess(true);
@@ -117,12 +177,14 @@ export function RegisterForm() {
         userId: result.userId,
         displayName: result.displayName,
         streamUserId: result.streamUserId,
-        token: result.token
+        token: result.token,
+        role,
+        gradeLevel: gradeLevel ?? undefined,
       });
 
       // Confetti effect then redirect
       setTimeout(() => {
-        router.replace("/messages");
+        router.replace("/dashboard");
       }, 2000);
     } catch (err) {
       const errorMessage =
@@ -279,6 +341,125 @@ export function RegisterForm() {
                 showStrength
                 disabled={loading}
               />
+
+              {/* Role Selector */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  I am a...
+                </label>
+                <Select
+                  value={role}
+                  onValueChange={(value) => value && setRole(value as UserRole)}
+                  disabled={loading}
+                >
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Select your role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="student">Student</SelectItem>
+                    <SelectItem value="teacher">Teacher</SelectItem>
+                    <SelectItem value="parent">Parent/Guardian</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Student-specific fields */}
+              <AnimatePresence>
+                {role === "student" && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4"
+                  >
+                    {/* Date of Birth */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        Date of Birth
+                      </label>
+                      <input
+                        type="date"
+                        value={dateOfBirth}
+                        onChange={(e) => setDateOfBirth(e.target.value)}
+                        className="w-full h-12 px-4 rounded-md border border-input bg-background text-foreground"
+                        required={role === "student"}
+                        disabled={loading}
+                        max={new Date().toISOString().split("T")[0]}
+                      />
+                      {age !== null && (
+                        <p className="text-xs text-muted-foreground">
+                          Age: {age} years old
+                          {requiresParentalConsent && (
+                            <span className="text-amber-500 ml-2">
+                              (Parental consent required)
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Grade Level */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4" />
+                        Grade Level
+                      </label>
+                      <Select
+                        value={gradeLevel?.toString() || ""}
+                        onValueChange={(value) => value && setGradeLevel(parseInt(value))}
+                        disabled={loading}
+                      >
+                        <SelectTrigger className="h-12">
+                          <SelectValue placeholder="Select your grade" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((grade) => (
+                            <SelectItem key={grade} value={grade.toString()}>
+                              Grade {grade}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Teacher-specific fields */}
+              <AnimatePresence>
+                {role === "teacher" && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="rounded-lg border border-border/50 bg-muted/50 p-4"
+                  >
+                    <p className="text-sm text-muted-foreground">
+                      As a teacher, you'll be able to create classes, start live sessions, 
+                      and manage student participation. Your account will need admin approval.
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Parent-specific fields */}
+              <AnimatePresence>
+                {role === "parent" && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="rounded-lg border border-border/50 bg-muted/50 p-4"
+                  >
+                    <p className="text-sm text-muted-foreground">
+                      As a parent/guardian, you'll be able to link to your child's account, 
+                      view their class schedule, and receive session summaries.
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
 
             {/* Terms checkbox */}
@@ -328,7 +509,7 @@ export function RegisterForm() {
             >
               <Button
                 type="submit"
-                disabled={loading || !username || !password || !acceptedTerms}
+                disabled={loading || !username || !password || !acceptedTerms || (role === "student" && (!dateOfBirth || !gradeLevel))}
                 className="w-full h-12 font-semibold text-sm animate-glow-pulse hover:scale-[1.02] hover:shadow-depth-3 transition-all duration-300"
                 size="lg"
               >
@@ -363,6 +544,15 @@ export function RegisterForm() {
       </AnimatePresence>
     </>
   );
+}
+
+function getSubdomain(): string | null {
+  if (typeof window === "undefined") return null;
+  const hostname = window.location.hostname;
+  if (hostname === "localhost" || hostname === "127.0.0.1") return null;
+  const parts = hostname.split(".");
+  if (parts.length < 3) return null;
+  return parts[0];
 }
 
 // Success view with confetti effect

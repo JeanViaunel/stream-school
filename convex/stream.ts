@@ -3,6 +3,7 @@
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { StreamClient } from "@stream-io/node-sdk";
+import { StreamChat } from "stream-chat";
 
 export const generateToken = internalAction({
   args: {
@@ -40,6 +41,61 @@ export const upsertStreamUser = internalAction({
         name: displayName,
       },
     ]);
+    return null;
+  },
+});
+
+export const createClassChannel = internalAction({
+  args: {
+    channelId: v.string(),
+    name: v.string(),
+    teacherStreamUserId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (_ctx, { channelId, name, teacherStreamUserId }) => {
+    const chatClient = StreamChat.getInstance(
+      process.env.STREAM_API_KEY!,
+      process.env.STREAM_API_SECRET!
+    );
+    const channel = chatClient.channel("classroom", channelId, {
+      name,
+      created_by_id: teacherStreamUserId,
+    } as Record<string, unknown>);
+    await channel.create();
+    return null;
+  },
+});
+
+export const addMemberToChannel = internalAction({
+  args: {
+    channelId: v.string(),
+    streamUserId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (_ctx, { channelId, streamUserId }) => {
+    const chatClient = StreamChat.getInstance(
+      process.env.STREAM_API_KEY!,
+      process.env.STREAM_API_SECRET!
+    );
+    const channel = chatClient.channel("classroom", channelId);
+    await channel.addMembers([streamUserId]);
+    return null;
+  },
+});
+
+export const removeMemberFromChannel = internalAction({
+  args: {
+    channelId: v.string(),
+    streamUserId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (_ctx, { channelId, streamUserId }) => {
+    const chatClient = StreamChat.getInstance(
+      process.env.STREAM_API_KEY!,
+      process.env.STREAM_API_SECRET!
+    );
+    const channel = chatClient.channel("classroom", channelId);
+    await channel.removeMembers([streamUserId]);
     return null;
   },
 });

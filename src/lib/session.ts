@@ -5,6 +5,9 @@ export interface Session {
   displayName: string;
   streamUserId: string;
   token: string;
+  organizationId?: string;
+  role?: "student" | "teacher" | "co_teacher" | "parent" | "school_admin" | "platform_admin";
+  gradeLevel?: number;
 }
 
 export function getSession(): Session | null {

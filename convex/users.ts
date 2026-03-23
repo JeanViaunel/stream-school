@@ -12,6 +12,21 @@ export const getUserByUsername = internalQuery({
       displayName: v.string(),
       streamUserId: v.string(),
       createdAt: v.number(),
+      role: v.optional(v.union(
+        v.literal("student"),
+        v.literal("teacher"),
+        v.literal("co_teacher"),
+        v.literal("parent"),
+        v.literal("school_admin"),
+        v.literal("platform_admin")
+      )),
+      organizationId: v.optional(v.id("organizations")),
+      gradeLevel: v.optional(v.number()),
+      avatarUrl: v.optional(v.string()),
+      parentConsentGiven: v.optional(v.boolean()),
+      parentConsentAt: v.optional(v.number()),
+      isActive: v.optional(v.boolean()),
+      lastSeenAt: v.optional(v.number()),
     }),
     v.null()
   ),
@@ -29,20 +44,35 @@ export const createUser = internalMutation({
     passwordHash: v.string(),
     displayName: v.string(),
     streamUserId: v.string(),
+    role: v.optional(v.union(
+      v.literal("student"),
+      v.literal("teacher"),
+      v.literal("co_teacher"),
+      v.literal("parent"),
+      v.literal("school_admin"),
+      v.literal("platform_admin")
+    )),
+    organizationId: v.optional(v.id("organizations")),
+    gradeLevel: v.optional(v.number()),
+    isActive: v.optional(v.boolean()),
   },
   returns: v.id("users"),
-  handler: async (ctx, { username, passwordHash, displayName, streamUserId }) => {
+  handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", username))
+      .withIndex("by_username", (q) => q.eq("username", args.username))
       .unique();
     if (existing !== null) throw new Error("Username already taken");
     return await ctx.db.insert("users", {
-      username,
-      passwordHash,
-      streamUserId,
-      displayName,
+      username: args.username,
+      passwordHash: args.passwordHash,
+      streamUserId: args.streamUserId,
+      displayName: args.displayName,
       createdAt: Date.now(),
+      role: args.role,
+      organizationId: args.organizationId,
+      gradeLevel: args.gradeLevel,
+      isActive: args.isActive,
     });
   },
 });
