@@ -2,6 +2,7 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { usernameFromIdentity } from "./authHelpers";
 
 export const createLink = mutation({
   args: {
@@ -17,7 +18,7 @@ export const createLink = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -98,7 +99,7 @@ export const getLinksByParent = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -133,7 +134,7 @@ export const getLinksByStudent = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {

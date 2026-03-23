@@ -48,6 +48,15 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+/** Stream `UserResponse` typings omit `status` in some versions; it exists at runtime. */
+function readStreamPresenceStatus(user: unknown): string | undefined {
+  if (user && typeof user === "object" && "status" in user) {
+    const s = (user as { status?: unknown }).status;
+    return typeof s === "string" ? s : undefined;
+  }
+  return undefined;
+}
+
 export function UserMenu({ onLogout }: UserMenuProps) {
   const { session } = useAuth();
   const { client } = useChatContext();
@@ -58,14 +67,14 @@ export function UserMenu({ onLogout }: UserMenuProps) {
 
   // Initialise from Stream user data on mount
   useEffect(() => {
-    const streamStatus = client.user?.status;
+    const streamStatus = readStreamPresenceStatus(client.user);
     if (typeof streamStatus === "string") {
       const match = (Object.keys(statusConfig) as UserStatus[]).find(
         (key) => statusConfig[key].label === streamStatus
       );
       setStatus(match ?? "online");
     }
-  }, [client.user?.status]);
+  }, [client.user]);
 
   const currentStatus = statusConfig[status];
   const StatusIcon = currentStatus.icon;
@@ -142,7 +151,9 @@ export function UserMenu({ onLogout }: UserMenuProps) {
                 try {
                   await client.partialUpdateUser({
                     id: session!.streamUserId,
-                    set: { status: statusConfig[s].label },
+                    set: {
+                      ...({ status: statusConfig[s].label } as Record<string, string>),
+                    },
                   });
                 } catch {
                   setStatus(status);

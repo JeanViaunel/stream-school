@@ -63,9 +63,14 @@ export function LoginForm() {
       
       login({
         userId: result.userId,
+        username,
         displayName: result.displayName,
         streamUserId: result.streamUserId,
         token: result.token,
+        convexAuthToken: result.convexAuthToken,
+        role: result.role,
+        organizationId: result.organizationId,
+        gradeLevel: result.gradeLevel,
       });
       
       // Small delay for success animation

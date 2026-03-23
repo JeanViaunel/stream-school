@@ -1,9 +1,28 @@
 "use client";
 
+import { useState } from "react";
+import { useAction } from "convex/react";
+import { api } from "@/../convex/_generated/api";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { type AppSettings } from "@/lib/settings";
 import { toast } from "sonner";
 
@@ -83,6 +102,55 @@ const SETTING_GROUPS: SettingGroup[] = [
 
 export default function SettingsPage() {
   const { settings, updateSetting } = useSettings();
+  const { session, logout } = useAuth();
+  const exportData = useAction(api.privacy.exportMyDataJson);
+  const deleteAccount = useAction(api.privacy.requestAccountDeletion);
+  const [exportPassword, setExportPassword] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleExport() {
+    if (!session?.userId || !session.username) return;
+    setExporting(true);
+    try {
+      const json = await exportData({
+        username: session.username,
+        password: exportPassword,
+      });
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `stream-school-export-${session.userId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Export downloaded");
+      setExportPassword("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!session?.userId || !session.username) return;
+    setDeleting(true);
+    try {
+      await deleteAccount({
+        username: session.username,
+        password: deletePassword,
+      });
+      toast.success("Account scheduled for deletion");
+      logout();
+      window.location.href = "/login";
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="flex h-screen bg-background">
@@ -134,6 +202,91 @@ export default function SettingsPage() {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div>
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Data &amp; account
+            </h2>
+            <div className="rounded-xl border border-border/50 bg-card/40 overflow-hidden px-4 py-4 space-y-6">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Export my data</p>
+                <p className="text-xs text-muted-foreground">
+                  Download a JSON archive of your profile and enrollments. Enter your password to confirm.
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="flex-1 space-y-1">
+                    <Label htmlFor="export-pw">Password</Label>
+                    <Input
+                      id="export-pw"
+                      type="password"
+                      autoComplete="current-password"
+                      value={exportPassword}
+                      onChange={(e) => setExportPassword(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={exporting || !exportPassword}
+                    onClick={handleExport}
+                  >
+                    {exporting ? "Exporting…" : "Download JSON"}
+                  </Button>
+                </div>
+              </div>
+              <Separator className="bg-border/30" />
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Delete my account</p>
+                <p className="text-xs text-muted-foreground">
+                  Deactivates your account and schedules removal of personal data after a 30-day retention window.
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="flex-1 space-y-1">
+                    <Label htmlFor="delete-pw">Password</Label>
+                    <Input
+                      id="delete-pw"
+                      type="password"
+                      autoComplete="current-password"
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                    />
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger
+                      type="button"
+                      disabled={!deletePassword}
+                      className={cn(
+                        buttonVariants({ variant: "destructive" }),
+                        "w-full sm:w-auto",
+                      )}
+                    >
+                      Delete account
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This cannot be undone from the app. Your account will be deactivated and PII removed after the retention period.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={(e) => {
+                            e.preventDefault();
+                            void handleDelete();
+                          }}
+                          disabled={deleting}
+                        >
+                          {deleting ? "Working…" : "Confirm delete"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </main>

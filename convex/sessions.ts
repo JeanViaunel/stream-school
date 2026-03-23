@@ -1,6 +1,7 @@
 import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { usernameFromIdentity } from "./authHelpers";
 
 export const updateRecordingUrl = internalMutation({
   args: {
@@ -171,7 +172,7 @@ export const getAttendance = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -296,7 +297,7 @@ export const getSessionsByClass = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {

@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   StreamCall,
-  StreamVideoClient,
   SpeakerLayout,
   useStreamVideoClient,
+  useCall,
   Call,
 } from "@stream-io/video-react-sdk";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,53 @@ import { LobbyAdmitter } from "./LobbyAdmitter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGradeSkin } from "@/contexts/GradeSkinContext";
 import { toast } from "sonner";
-import { Loader2, MicOff } from "lucide-react";
+import { Loader2, MicOff, Captions } from "lucide-react";
+
+type CallWithTranscription = Call & {
+  startTranscription?: () => Promise<void>;
+  stopTranscription?: () => Promise<void>;
+};
+
+function TranscriptionControls({ isTeacher }: { isTeacher: boolean }) {
+  const call = useCall() as CallWithTranscription | undefined;
+  const [captionsOn, setCaptionsOn] = useState(false);
+
+  async function toggleCaptions() {
+    if (!call) return;
+    try {
+      if (captionsOn) {
+        await call.stopTranscription?.();
+        setCaptionsOn(false);
+        toast.success("Captions stopped");
+      } else {
+        await call.startTranscription?.();
+        setCaptionsOn(true);
+        toast.success("Captions started");
+      }
+    } catch {
+      toast.error("Transcription is not available for this call");
+    }
+  }
+
+  if (!isTeacher) return null;
+
+  return (
+    <div className="absolute bottom-16 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        className="gap-2"
+        onClick={toggleCaptions}
+        aria-pressed={captionsOn}
+        aria-label={captionsOn ? "Turn off live captions" : "Turn on live captions"}
+      >
+        <Captions className="h-4 w-4" />
+        CC
+      </Button>
+    </div>
+  );
+}
 
 interface ClassCallRoomProps {
   callId: string;
@@ -40,6 +86,7 @@ export function ClassCallRoom({
 }: ClassCallRoomProps) {
   const { session } = useAuth();
   const { gradeBand } = useGradeSkin();
+  const isPrimaryBand = gradeBand === "primary";
   const client = useStreamVideoClient();
   const [call, setCall] = useState<Call | null>(null);
   const [isJoining, setIsJoining] = useState(false);
@@ -173,24 +220,24 @@ export function ClassCallRoom({
     <div className="relative h-full">
       <StreamCall call={call}>
         <div className="flex h-full">
-          {/* Main call area */}
-          <div className="flex-1 relative">
+          <div className="relative flex-1">
             <SpeakerLayout />
-            
-            {/* Teacher controls overlay */}
-            {isTeacher && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+
+            {/* EDU-T59: primary band — simplified call chrome (no bulk mute; CC remains for accessibility) */}
+            {isTeacher && !isPrimaryBand && (
+              <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2">
                 <Button
                   variant="destructive"
                   size="sm"
                   onClick={handleMuteAll}
                   className="flex items-center gap-2"
                 >
-                  <MicOff className="w-4 h-4" />
+                  <MicOff className="h-4 w-4" />
                   Mute All
                 </Button>
               </div>
             )}
+            <TranscriptionControls isTeacher={isTeacher} />
           </div>
 
           {/* Teacher sidebar with lobby */}

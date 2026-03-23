@@ -9,8 +9,8 @@ import type { Id } from "@/../convex/_generated/dataModel";
 import type { Channel } from "stream-chat";
 import { ClassSidebar } from "@/components/class/ClassSidebar";
 import { ClassHeader } from "@/components/class/ClassHeader";
+import { ClassroomTabs } from "@/components/class/ClassroomTabs";
 import { ChannelView } from "@/components/chat/ChannelView";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -130,25 +130,18 @@ export default function ClassPage() {
           onArchiveClass={handleArchiveClass}
         />
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {channelReady ? (
-            <ChannelView />
+            <ClassroomTabs
+              classId={classData._id}
+              teacherId={classData.teacherId}
+              chatPanel={<ChannelView />}
+            />
           ) : (
-            <div className="h-full flex items-center justify-center">
+            <div className="flex h-full items-center justify-center">
               <Skeleton className="h-full w-full" />
             </div>
           )}
-        </div>
-
-        <div className="border-t border-border p-4 bg-card">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Assignments will appear here in V2
-            </p>
-            <Button variant="ghost" size="sm" disabled>
-              View All
-            </Button>
-          </div>
         </div>
       </div>
     </div>

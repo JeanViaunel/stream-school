@@ -1,6 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { usernameFromIdentity } from "./authHelpers";
 
 export const createScheduledSession = mutation({
   args: {
@@ -22,7 +23,7 @@ export const createScheduledSession = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -83,7 +84,7 @@ export const getUpcoming = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -170,7 +171,7 @@ export const deleteScheduledSession = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -223,7 +224,7 @@ export const getSessionsByClass = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -293,7 +294,7 @@ export const getSessionById = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -330,5 +331,33 @@ export const getSessionById = query({
         subject: cls.subject,
       },
     };
+  },
+});
+
+export const listScheduledSessionsForExport = internalQuery({
+  args: {
+    classId: v.id("classes"),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("scheduledSessions"),
+      _creationTime: v.number(),
+      classId: v.id("classes"),
+      teacherId: v.id("users"),
+      title: v.string(),
+      description: v.optional(v.string()),
+      scheduledAt: v.number(),
+      durationMinutes: v.number(),
+      icalUid: v.string(),
+      isArchived: v.boolean(),
+      createdAt: v.number(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("scheduledSessions")
+      .withIndex("by_class", (q) => q.eq("classId", args.classId))
+      .collect();
+    return rows.filter((r) => !r.isArchived);
   },
 });

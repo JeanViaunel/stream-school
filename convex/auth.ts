@@ -4,11 +4,25 @@ import { v } from "convex/values";
 import { type Id } from "./_generated/dataModel";
 import bcrypt from "bcryptjs";
 
+const userRoleReturn = v.union(
+  v.literal("student"),
+  v.literal("teacher"),
+  v.literal("co_teacher"),
+  v.literal("parent"),
+  v.literal("school_admin"),
+  v.literal("platform_admin")
+);
+
 type AuthResult = {
   userId: Id<"users">;
   displayName: string;
   streamUserId: string;
   token: string;
+  /** RS256 JWT for Convex `ctx.auth` (not the Stream token). */
+  convexAuthToken: string;
+  role: "student" | "teacher" | "co_teacher" | "parent" | "school_admin" | "platform_admin";
+  organizationId: Id<"organizations"> | undefined;
+  gradeLevel: number | undefined;
 };
 
 export const register = action({
@@ -16,14 +30,6 @@ export const register = action({
     username: v.string(),
     password: v.string(),
     displayName: v.string(),
-    role: v.optional(v.union(
-      v.literal("student"),
-      v.literal("teacher"),
-      v.literal("co_teacher"),
-      v.literal("parent"),
-      v.literal("school_admin"),
-      v.literal("platform_admin")
-    )),
     organizationId: v.optional(v.id("organizations")),
     gradeLevel: v.optional(v.number()),
   },
@@ -32,23 +38,29 @@ export const register = action({
     displayName: v.string(),
     streamUserId: v.string(),
     token: v.string(),
+    convexAuthToken: v.string(),
+    role: userRoleReturn,
+    organizationId: v.optional(v.id("organizations")),
+    gradeLevel: v.optional(v.number()),
   }),
   handler: async (
     ctx: ActionCtx,
-    args: { username: string; password: string; displayName: string; role?: string; organizationId?: Id<"organizations">; gradeLevel?: number }
+    args: { username: string; password: string; displayName: string; organizationId?: Id<"organizations">; gradeLevel?: number }
   ): Promise<AuthResult> => {
     const passwordHash: string = await bcrypt.hash(args.password, 10);
     const streamUserId: string = `user_${args.username}`;
 
-    const role = (args.role ?? "student") as "student" | "teacher" | "co_teacher" | "parent" | "school_admin" | "platform_admin";
-    
+    const organizationId: Id<"organizations"> =
+      args.organizationId ?? (await getDefaultOrgId(ctx));
+    const role = "student" as const;
+
     const userId: Id<"users"> = await ctx.runMutation(internal.users.createUser, {
       username: args.username,
       passwordHash,
       displayName: args.displayName,
       streamUserId,
       role,
-      organizationId: args.organizationId ?? (await getDefaultOrgId(ctx)),
+      organizationId,
       gradeLevel: args.gradeLevel,
       isActive: true,
     });
@@ -61,7 +73,20 @@ export const register = action({
       displayName: args.displayName,
     });
 
-    return { userId, displayName: args.displayName, streamUserId, token };
+    const convexAuthToken: string = await ctx.runAction(internal.convexJwt.signConvexAuthToken, {
+      username: args.username,
+    });
+
+    return {
+      userId,
+      displayName: args.displayName,
+      streamUserId,
+      token,
+      convexAuthToken,
+      role,
+      organizationId,
+      gradeLevel: args.gradeLevel,
+    };
   },
 });
 
@@ -93,18 +118,16 @@ export const login = action({
     displayName: v.string(),
     streamUserId: v.string(),
     token: v.string(),
+    convexAuthToken: v.string(),
+    role: userRoleReturn,
+    organizationId: v.optional(v.id("organizations")),
+    gradeLevel: v.optional(v.number()),
   }),
   handler: async (
     ctx: ActionCtx,
     args: { username: string; password: string }
   ): Promise<AuthResult> => {
-    const user: {
-      _id: Id<"users">;
-      _creationTime: number;
-      passwordHash: string;
-      displayName: string;
-      streamUserId: string;
-    } | null = await ctx.runQuery(internal.users.getUserByUsername, {
+    const user = await ctx.runQuery(internal.users.getUserByUsername, {
       username: args.username,
     });
     if (user === null) throw new Error("Invalid username or password");
@@ -116,11 +139,23 @@ export const login = action({
       userId: user.streamUserId,
     });
 
+    const role =
+      user.role ??
+      ("student" as "student" | "teacher" | "co_teacher" | "parent" | "school_admin" | "platform_admin");
+
+    const convexAuthToken: string = await ctx.runAction(internal.convexJwt.signConvexAuthToken, {
+      username: user.username,
+    });
+
     return {
       userId: user._id,
       displayName: user.displayName,
       streamUserId: user.streamUserId,
       token,
+      convexAuthToken,
+      role,
+      organizationId: user.organizationId,
+      gradeLevel: user.gradeLevel,
     };
   },
 });

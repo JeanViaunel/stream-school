@@ -9,18 +9,27 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as analytics from "../analytics.js";
 import type * as assignments from "../assignments.js";
+import type * as auditLog from "../auditLog.js";
 import type * as auth from "../auth.js";
+import type * as authConstants from "../authConstants.js";
+import type * as authHelpers from "../authHelpers.js";
 import type * as classes from "../classes.js";
+import type * as convexAuthJwks from "../convexAuthJwks.js";
+import type * as convexJwt from "../convexJwt.js";
 import type * as crons from "../crons.js";
 import type * as grades from "../grades.js";
 import type * as http from "../http.js";
+import type * as icalExport from "../icalExport.js";
 import type * as moderation from "../moderation.js";
 import type * as moderationActions from "../moderationActions.js";
 import type * as notifications from "../notifications.js";
 import type * as organizations from "../organizations.js";
 import type * as parentLinks from "../parentLinks.js";
 import type * as polls from "../polls.js";
+import type * as privacy from "../privacy.js";
+import type * as privacyQueries from "../privacyQueries.js";
 import type * as recordings from "../recordings.js";
 import type * as schedule from "../schedule.js";
 import type * as sessions from "../sessions.js";
@@ -36,18 +45,27 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  analytics: typeof analytics;
   assignments: typeof assignments;
+  auditLog: typeof auditLog;
   auth: typeof auth;
+  authConstants: typeof authConstants;
+  authHelpers: typeof authHelpers;
   classes: typeof classes;
+  convexAuthJwks: typeof convexAuthJwks;
+  convexJwt: typeof convexJwt;
   crons: typeof crons;
   grades: typeof grades;
   http: typeof http;
+  icalExport: typeof icalExport;
   moderation: typeof moderation;
   moderationActions: typeof moderationActions;
   notifications: typeof notifications;
   organizations: typeof organizations;
   parentLinks: typeof parentLinks;
   polls: typeof polls;
+  privacy: typeof privacy;
+  privacyQueries: typeof privacyQueries;
   recordings: typeof recordings;
   schedule: typeof schedule;
   sessions: typeof sessions;

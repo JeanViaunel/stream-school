@@ -2,9 +2,13 @@ const SESSION_KEY = "stream_app_session";
 
 export interface Session {
   userId: string;
+  username?: string;
   displayName: string;
   streamUserId: string;
+  /** Stream Chat / Video token (not Convex auth). */
   token: string;
+  /** JWT for Convex `ctx.auth` — set on login/register. */
+  convexAuthToken?: string;
   organizationId?: string;
   role?: "student" | "teacher" | "co_teacher" | "parent" | "school_admin" | "platform_admin";
   gradeLevel?: number;

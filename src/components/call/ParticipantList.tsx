@@ -160,13 +160,18 @@ export function ParticipantList({
             variant="ghost"
             onClick={onClose}
             className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
+            aria-label="Close participants list"
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
 
         {/* List */}
-        <div ref={listRef} className="overflow-y-auto h-[calc(100%-65px)] scrollbar-thin p-2 space-y-1">
+        <div
+          ref={listRef}
+          role="list"
+          className="overflow-y-auto h-[calc(100%-65px)] scrollbar-thin p-2 space-y-1"
+        >
           {participants.map((participant, index) => {
             const isLocal =
               participant.sessionId === localParticipant?.sessionId;
@@ -185,6 +190,7 @@ export function ParticipantList({
             return (
               <div
                 key={participant.sessionId}
+                role="listitem"
                 data-session={participant.sessionId}
                 className={cn(
                   "group flex items-center gap-3 p-3 rounded-xl transition-all duration-200",

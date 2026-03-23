@@ -3,8 +3,6 @@
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { OrgProvider } from "@/contexts/OrgContext";
-import { GradeSkinProvider } from "@/contexts/GradeSkinContext";
 import { StreamContext } from "@/contexts/StreamContext";
 import { UIActionsProvider } from "@/contexts/UIActionsContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
@@ -13,6 +11,7 @@ import { IncomingCallModal } from "@/components/call/IncomingCallModal";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NotificationManager } from "@/components/NotificationManager";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GradeSkin } from "@/components/ui/GradeSkin";
 
 function AppLoadingScreen() {
   return (
@@ -61,21 +60,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <SettingsProvider>
       <UIActionsProvider>
-        <OrgProvider>
-          <GradeSkinProvider>
-            <StreamContext>
-              <CommandPalette />
-              <IncomingCallModal />
-              <NotificationManager />
-              <div className="flex h-screen">
-                <Sidebar />
-                <main className="flex-1 overflow-auto">
-                  {children}
-                </main>
-              </div>
-            </StreamContext>
-          </GradeSkinProvider>
-        </OrgProvider>
+        <StreamContext>
+          <GradeSkin className="flex h-full min-h-0 w-full flex-col">
+            <CommandPalette />
+            <IncomingCallModal />
+            <NotificationManager />
+            <div className="flex h-screen min-h-0">
+              <Sidebar />
+              <main className="flex-1 overflow-auto">{children}</main>
+            </div>
+          </GradeSkin>
+        </StreamContext>
       </UIActionsProvider>
     </SettingsProvider>
   );

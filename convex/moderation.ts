@@ -1,6 +1,8 @@
 import { internalMutation, mutation, query } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { usernameFromIdentity } from "./authHelpers";
 
 // Flag a message for moderation
 export const flagMessage = internalMutation({
@@ -35,19 +37,20 @@ export const flagMessage = internalMutation({
   },
 });
 
-// Helper to check if user is teacher or admin
-async function isTeacherOrAdmin(ctx: any): Promise<boolean> {
+async function isTeacherOrAdmin(ctx: QueryCtx): Promise<boolean> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return false;
-  
+
   const user = await ctx.db
     .query("users")
-    .withIndex("by_username", (q: any) => q.eq("username", identity.tokenIdentifier))
+    .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
     .unique();
-    
-  return user?.role === "teacher" || 
-         user?.role === "school_admin" || 
-         user?.role === "platform_admin";
+
+  return (
+    user?.role === "teacher" ||
+    user?.role === "school_admin" ||
+    user?.role === "platform_admin"
+  );
 }
 
 // Review a flagged message - returns data needed to perform action
@@ -75,7 +78,7 @@ export const reviewFlag = internalMutation({
 
     const reviewer = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!reviewer) throw new Error("Reviewer not found");
@@ -143,23 +146,29 @@ export const getFlagQueue = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user || !user.organizationId) {
       throw new Error("User not found or not associated with an organization");
     }
 
-    let query = ctx.db
-      .query("moderationFlags")
-      .withIndex("by_organization", (q) => q.eq("organizationId", user.organizationId!))
-      .order("desc");
-
-    if (args.status) {
-      query = query.filter((q) => q.eq(q.field("status"), args.status));
-    }
-
-    const flags = await query.take(100);
+    const orgId = user.organizationId!;
+    const flags = await (
+      args.status
+        ? ctx.db
+            .query("moderationFlags")
+            .withIndex("by_organization_and_status", (q) =>
+              q.eq("organizationId", orgId).eq("status", args.status!)
+            )
+            .order("desc")
+            .take(100)
+        : ctx.db
+            .query("moderationFlags")
+            .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+            .order("desc")
+            .take(100)
+    );
 
     // Get user display names
     const flagsWithUserInfo = await Promise.all(

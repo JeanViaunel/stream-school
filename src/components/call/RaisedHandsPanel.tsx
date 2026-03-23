@@ -99,10 +99,11 @@ export function RaisedHandsPanel({
                 No raised hands
               </motion.div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2" role="list">
                 {raisedHands.map((hand, index) => (
                   <motion.div
                     key={hand.userId}
+                    role="listitem"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
@@ -126,6 +127,7 @@ export function RaisedHandsPanel({
                       variant="ghost"
                       className="h-8 w-8"
                       onClick={() => onLowerHand?.(hand.userId)}
+                      aria-label={`Lower hand for ${hand.userName}`}
                     >
                       <Check className="w-4 h-4" />
                     </Button>

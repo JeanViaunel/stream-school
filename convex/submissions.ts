@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { usernameFromIdentity } from "./authHelpers";
 
 export const submitAnswers = mutation({
   args: {
@@ -19,7 +20,7 @@ export const submitAnswers = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -101,7 +102,7 @@ export const gradeSubmission = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -168,7 +169,7 @@ export const getSubmissionsByAssignment = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -244,7 +245,7 @@ export const getMySubmission = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {

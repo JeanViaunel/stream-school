@@ -76,3 +76,18 @@ export const createUser = internalMutation({
     });
   },
 });
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+export const scheduleDeletion = internalMutation({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const at = Date.now() + THIRTY_DAYS_MS;
+    await ctx.db.patch(args.userId, {
+      isActive: false,
+      deletionScheduledAt: at,
+    });
+    return null;
+  },
+});

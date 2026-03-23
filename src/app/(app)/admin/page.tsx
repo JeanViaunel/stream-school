@@ -8,14 +8,16 @@ import { api } from "@/../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { 
-  Users, 
-  BookOpen, 
+import {
+  Users,
+  BookOpen,
   School,
   ChevronRight,
   Plus,
   Shield,
-  ShieldAlert
+  ShieldAlert,
+  BarChart3,
+  ScrollText,
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -194,6 +196,46 @@ export default function AdminPage() {
                 </Button>
               </Link>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5" />
+              Analytics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              DAU, sessions, attendance trends, and class health signals.
+            </p>
+            <Link href="/admin/analytics" className="flex-1">
+              <Button variant="outline" className="w-full">
+                Open analytics
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ScrollText className="w-5 h-5" />
+              Audit log
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Review administrative actions across your organization.
+            </p>
+            <Link href="/admin/audit-log" className="flex-1">
+              <Button variant="outline" className="w-full">
+                View audit log
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>

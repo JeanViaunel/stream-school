@@ -11,25 +11,22 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGradeSkin } from "@/contexts/GradeSkinContext";
 import { toast } from "sonner";
-import { 
-  Plus, 
-  BookOpen, 
-  Users, 
-  GraduationCap, 
+import {
+  Plus,
+  BookOpen,
+  Users,
+  GraduationCap,
   Hash,
-  Calendar,
   ChevronRight,
   School,
-  LayoutDashboard
 } from "lucide-react";
+import { CalendarView } from "@/components/schedule/CalendarView";
 
 export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { session } = useAuth();
-  const { gradeBand } = useGradeSkin();
   const [joinCode, setJoinCode] = useState("");
   const [showJoinDialog, setShowJoinDialog] = useState(false);
   
@@ -84,6 +81,10 @@ export default function DashboardPage() {
             Here are your classes for today
           </p>
         </header>
+
+        <div className="mb-8">
+          <CalendarView />
+        </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {studentClasses?.map((cls) => (
@@ -176,6 +177,10 @@ export default function DashboardPage() {
           </Link>
         </header>
 
+        <div className="mb-8">
+          <CalendarView />
+        </div>
+
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {teacherClasses?.map((cls) => (
             <Link key={cls._id} href={`/class/${cls._id}`}>
@@ -235,6 +240,10 @@ export default function DashboardPage() {
           </p>
         </header>
 
+        <div className="mb-8">
+          <CalendarView />
+        </div>
+
         <Card>
           <CardContent className="p-8 text-center">
             <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
@@ -258,6 +267,10 @@ export default function DashboardPage() {
           Manage your organization
         </p>
       </header>
+
+      <div className="mb-8">
+        <CalendarView />
+      </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>

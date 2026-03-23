@@ -48,19 +48,19 @@ See `CURRENT-STATE.md` for current base-app completion status.
 
 ### Contexts & routing
 
-- [ ] **EDU-T06** — Create `src/contexts/OrgContext.tsx`:
+- [x] **EDU-T06** — Create `src/contexts/OrgContext.tsx`:
   - Reads `organizationId` from current session (extend `AuthContext` session type to include `organizationId`, `role`, `gradeLevel`)
   - Fetches org via `api.organizations.getById`
   - Provides `org`, `orgSettings`, `userRole` to all children
   - Must be mounted inside `AuthContext` but outside `StreamContext`
 
-- [ ] **EDU-T07** — Create `src/contexts/GradeSkinContext.tsx`:
+- [x] **EDU-T07** — Create `src/contexts/GradeSkinContext.tsx`:
   - Derives `gradeBand: "primary" | "middle" | "high"` from `gradeLevel` in session (1–3 → primary, 4–8 → middle, 9–12 → high; teachers and admins get "high")
   - Sets `data-grade-band` attribute on `<body>` element
   - Provides `gradeBand` and `isBand(band)` helper to all consumers
   - Read `GRADE-SKIN.md` before implementing
 
-- [ ] **EDU-T08** — Update `src/app/(app)/layout.tsx`:
+- [x] **EDU-T08** — Update `src/app/(app)/layout.tsx`:
   - Mount `OrgContext` and `GradeSkinContext` around existing `StreamContext`
   - Add role-based redirect: students without `isActive` → `/pending-approval`; parents → `/parent`; admins → `/admin` dashboard on first login
 
@@ -297,45 +297,45 @@ See `CURRENT-STATE.md` for current base-app completion status.
 
 ### Gradebook
 
-- [ ] **EDU-T46** — Add `grades` table to `convex/schema.ts`; deploy
+- [x] **EDU-T46** — Add `grades` table to `convex/schema.ts`; deploy
 
-- [ ] **EDU-T47** — Write `convex/grades.ts`:
+- [x] **EDU-T47** — Write `convex/grades.ts`:
   - `recordGrade` mutation (teacher only): upsert grade from submission
   - `getGradebookByClass` query (teacher/admin only): all students × all assignments matrix
   - `getMyGrades` query (student): own grades across all assignments for a class
   - `getChildGrades` query (parent): child's grades (verified via `parentLinks`)
 
-- [ ] **EDU-T48** — Create `src/components/gradebook/Gradebook.tsx`:
+- [x] **EDU-T48** — Create `src/components/gradebook/Gradebook.tsx`:
   - Teacher: spreadsheet-style grid — rows = students, columns = assignments, cells = score or "—"
   - Click a cell: opens inline grade edit for short-answer assignments
   - Column header shows assignment average
   - "Export CSV" button downloads full gradebook
 
-- [ ] **EDU-T49** — Add student grade view to `src/app/(app)/class/[classId]/page.tsx`:
+- [x] **EDU-T49** — Add student grade view to `src/app/(app)/class/[classId]/page.tsx`:
   - "My Grades" tab alongside class chat
   - Shows assignment list with score, submission date, teacher feedback
 
 ### Scheduling & calendar
 
-- [ ] **EDU-T50** — Add `scheduledSessions` table to `convex/schema.ts`; deploy
+- [x] **EDU-T50** — Add `scheduledSessions` table to `convex/schema.ts`; deploy
 
-- [ ] **EDU-T51** — Write `convex/schedule.ts`:
+- [x] **EDU-T51** — Write `convex/schedule.ts`:
   - `createScheduledSession` mutation (teacher only): insert record, generate stable `icalUid`
   - `getUpcoming` query: all sessions in next 30 days for current user's classes
   - `deleteScheduledSession` mutation: soft-delete (set archived flag)
 
-- [ ] **EDU-T52** — Create `src/components/schedule/CalendarView.tsx`:
+- [x] **EDU-T52** — Create `src/components/schedule/CalendarView.tsx`:
   - Month/week toggle (shadcn Calendar or a lightweight grid)
   - Upcoming sessions as colored event blocks per class
   - Click event → class details + "Join when live" button (enabled only when session is active)
 
-- [ ] **EDU-T53** — Create `src/lib/ical.ts` + `src/app/api/schedule/[classId]/ical/route.ts`:
+- [x] **EDU-T53** — Create `src/lib/ical.ts` + `src/app/api/schedule/[classId]/ical/route.ts`:
   - Route handler: verifies auth, builds RFC 5545 iCal string from `scheduledSessions`, returns with `Content-Type: text/calendar`
   - `ical.ts`: `buildIcal(sessions: ScheduledSession[]): string` — pure function, no external lib required for simple implementation
 
 ### Recording
 
-- [ ] **EDU-T54** — Create `src/components/call/RecordingBanner.tsx`:
+- [x] **EDU-T54** — Create `src/components/call/RecordingBanner.tsx`:
   - Appears as a banner at the top of `ClassCallRoom` when recording is active
   - Shown to all participants (including students who join mid-recording)
   - Teacher controls: "Stop Recording" button
@@ -344,21 +344,21 @@ See `CURRENT-STATE.md` for current base-app completion status.
 
 - [ ] **EDU-T55** — Wire recording storage: in `convex/http.ts`, handle `call.recording_ready` Stream webhook; download recording URL from payload; upload to S3 via `internal.recordings.storeRecording`; update `sessions.recordingUrl`
 
-- [ ] **EDU-T56** — Add recording playback UI to class page: "Past Sessions" tab shows session list with recording thumbnail and play link (opens recording URL in a new tab or in-app player)
+- [x] **EDU-T56** — Add recording playback UI to class page: "Past Sessions" tab shows session list with recording thumbnail and play link (opens recording URL in a new tab or in-app player)
 
 ### Grade-adaptive UI
 
-- [ ] **EDU-T57** — Create `src/lib/gradeTheme.ts`:
+- [x] **EDU-T57** — Create `src/lib/gradeTheme.ts`:
   - Export `GRADE_BANDS` constant mapping band → CSS variable overrides (font size scale, icon size, border radius, button height)
   - Export `getGradeBand(gradeLevel: number): GradeBand` function
 
-- [ ] **EDU-T58** — Create `src/components/ui/GradeSkin.tsx`:
+- [x] **EDU-T58** — Create `src/components/ui/GradeSkin.tsx`:
   - Reads `gradeBand` from `GradeSkinContext`
   - Sets CSS variables on a wrapping `<div>` according to `gradeTheme.ts`
   - Mount once at the top of `app/(app)/layout.tsx` wrapping all content
   - Read `GRADE-SKIN.md` fully before implementing
 
-- [ ] **EDU-T59** — Apply grade-band-conditional rendering to key components:
+- [x] **EDU-T59** — Apply grade-band-conditional rendering to key components:
   - `ClassSidebar.tsx`: primary band → icon + color dot only (no text labels); high band → compact text list
   - `ClassCallRoom.tsx`: primary band → hide Q&A panel, screenshare button, layout switcher; show only mic/camera/leave
   - `RaisedHandsPanel.tsx`: primary band → single large ✋ button, no text queue
@@ -366,46 +366,46 @@ See `CURRENT-STATE.md` for current base-app completion status.
 
 ### Advanced admin
 
-- [ ] **EDU-T60** — Add `auditLogs` table to `convex/schema.ts`; deploy
+- [x] **EDU-T60** — Add `auditLogs` table to `convex/schema.ts`; deploy
 
-- [ ] **EDU-T61** — Write `convex/auditLog.ts`:
+- [x] **EDU-T61** — Write `convex/auditLog.ts`:
   - `logAction` internalMutation: insert audit record — call from every admin mutation
   - `getAuditLog` query (admin only): paginated log for org, filterable by action type and actor
 
-- [ ] **EDU-T62** — Create `src/app/(app)/admin/analytics/page.tsx` + `src/components/admin/OrgAnalytics.tsx`:
+- [x] **EDU-T62** — Create `src/app/(app)/admin/analytics/page.tsx` + `src/components/admin/OrgAnalytics.tsx`:
   - Cards: DAU (last 7 days), total sessions this month, avg session duration, attendance rate %
   - Line chart: daily active users (7-day window) using a lightweight chart lib (Recharts or Chart.js)
   - Class health table: classes flagged for no session > 7 days, low attendance < 60%
 
-- [ ] **EDU-T63** — Create `src/app/(app)/admin/audit-log/page.tsx` + `src/components/admin/AuditLogViewer.tsx`:
+- [x] **EDU-T63** — Create `src/app/(app)/admin/audit-log/page.tsx` + `src/components/admin/AuditLogViewer.tsx`:
   - Paginated table: timestamp, actor, action, target, metadata
   - Filter by action type (role_changed, user_removed, class_archived, etc.)
 
 ### Multi-school & white-label
 
-- [ ] **EDU-T64** — Create `src/middleware.ts`:
+- [x] **EDU-T64** — Create `src/middleware.ts`:
   - Resolve `organizationId` from subdomain (`req.nextUrl.hostname` → strip `.streamschool.app` suffix → look up org by slug)
   - Attach resolved `orgId` to request headers for use in server components
   - Pass through for localhost (development mode)
 
-- [ ] **EDU-T65** — Update `OrgContext.tsx` to read org from the header set by middleware when running on a custom subdomain, falling back to query-param `?org=` for localhost dev
+- [x] **EDU-T65** — Update `OrgContext.tsx` to read org from the header set by middleware when running on a custom subdomain, falling back to query-param `?org=` for localhost dev
 
 ### Accessibility
 
-- [ ] **EDU-T66** — Audit all custom components for WCAG 2.1 AA:
+- [x] **EDU-T66** — Audit all custom components for WCAG 2.1 AA:
   - All `<button>` elements have accessible labels (no icon-only buttons without `aria-label`)
   - All form fields have associated `<label>` or `aria-label`
   - `ParticipantList`, `RaisedHandsPanel`, `QAPanel` have correct `role="list"` and `role="listitem"`
   - Color contrast: run axe-core or similar against all three grade skins
   - Keyboard navigation: Tab order is logical through all panels; Escape closes all modals
 
-- [ ] **EDU-T67** — Add captions toggle to `ClassCallRoom.tsx`:
+- [x] **EDU-T67** — Add captions toggle to `ClassCallRoom.tsx`:
   - Teacher "CC" button: calls `call.startTranscription()` / `call.stopTranscription()`
   - Captions overlay renders transcription events from `useCallStateHooks` (verify exact hook name in live docs: `https://getstream.io/video/docs/react/transcribing/calls.md` before implementing)
 
 ### Data privacy
 
-- [ ] **EDU-T68** — Add data export + account deletion to `src/app/(app)/settings/page.tsx`:
+- [x] **EDU-T68** — Add data export + account deletion to `src/app/(app)/settings/page.tsx`:
   - "Export my data" button: triggers Convex action that collects all user records (messages via Stream export API, Convex rows) and emails a JSON archive to the user's registered email
   - "Delete my account" button: confirmation dialog → deactivates user, queues deletion of PII after 30-day retention window
   - Read `COMPLIANCE.md` §2 before implementing

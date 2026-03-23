@@ -23,6 +23,7 @@ export default defineSchema({
     parentConsentAt: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
     lastSeenAt: v.optional(v.number()),
+    deletionScheduledAt: v.optional(v.number()),
   })
     .index("by_username", ["username"])
     .index("by_organization", ["organizationId"])
@@ -191,7 +192,8 @@ export default defineSchema({
   })
     .index("by_organization", ["organizationId"])
     .index("by_status", ["status"])
-    .index("by_message", ["messageId"]),
+    .index("by_message", ["messageId"])
+    .index("by_organization_and_status", ["organizationId", "status"]),
 
   scheduledSessions: defineTable({
     classId: v.id("classes"),
@@ -206,4 +208,16 @@ export default defineSchema({
   })
     .index("by_class", ["classId"])
     .index("by_class_and_scheduled_at", ["classId", "scheduledAt"]),
+
+  auditLogs: defineTable({
+    organizationId: v.id("organizations"),
+    actorId: v.id("users"),
+    action: v.string(),
+    targetId: v.optional(v.string()),
+    targetType: v.optional(v.string()),
+    metadata: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_organization", ["organizationId"])
+    .index("by_organization_and_created_at", ["organizationId", "createdAt"]),
 });

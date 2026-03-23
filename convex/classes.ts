@@ -2,6 +2,7 @@ import { action, internalMutation, internalQuery, mutation, query } from "./_gen
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { usernameFromIdentity } from "./authHelpers";
 
 export const createClass = action({
   args: {
@@ -26,7 +27,7 @@ export const createClass = action({
       organizationId?: Id<"organizations">;
       streamUserId: string;
     } | null = await ctx.runQuery(internal.users.getUserByUsername, {
-      username: identity.tokenIdentifier,
+      username: usernameFromIdentity(identity),
     });
 
     if (!user) {
@@ -122,7 +123,7 @@ export const getClassesByTeacher = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -162,7 +163,7 @@ export const getClassesByStudent = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -215,7 +216,7 @@ export const getClassById = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {
@@ -259,7 +260,7 @@ export const enrollByJoinCode = action({
       role?: string;
       streamUserId: string;
     } | null = await ctx.runQuery(internal.users.getUserByUsername, {
-      username: identity.tokenIdentifier,
+      username: usernameFromIdentity(identity),
     });
 
     if (!user) {
@@ -367,7 +368,7 @@ export const archiveClass = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!user) {

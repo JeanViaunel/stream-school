@@ -4,7 +4,6 @@ import "./globals.css";
 import "stream-chat-react/dist/css/v2/index.css";
 import "@stream-io/video-react-sdk/dist/css/styles.css";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
-import { AuthProvider } from "@/contexts/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
 
 const syne = Syne({
@@ -41,9 +40,7 @@ export default function RootLayout({
       className={`${syne.variable} ${dmSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ConvexClientProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ConvexClientProvider>
+        <ConvexClientProvider>{children}</ConvexClientProvider>
         <Toaster />
       </body>
     </html>

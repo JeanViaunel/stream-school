@@ -218,11 +218,12 @@ export function QAPanel({ isTeacher = false }: QAPanelProps) {
           </div>
 
           <ScrollArea className="h-[250px]">
-            <div className="space-y-2">
+            <div className="space-y-2" role="list">
               <AnimatePresence>
                 {[...pendingQuestions, ...answeredQuestions].map((q) => (
                   <motion.div
                     key={q.id}
+                    role="listitem"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
@@ -277,11 +278,12 @@ export function QAPanel({ isTeacher = false }: QAPanelProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         <ScrollArea className="h-[350px]">
-          <div className="space-y-3">
+          <div className="space-y-3" role="list">
             <AnimatePresence>
               {pendingQuestions.map((q, index) => (
                 <motion.div
                   key={q.id}
+                  role="listitem"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}

@@ -2,6 +2,7 @@ import { action, internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { usernameFromIdentity } from "./authHelpers";
 
 // Helper to check if user is admin
 async function isAdmin(ctx: any) {
@@ -10,7 +11,7 @@ async function isAdmin(ctx: any) {
   
   const user = await ctx.db
     .query("users")
-    .withIndex("by_username", (q: any) => q.eq("username", identity.tokenIdentifier))
+    .withIndex("by_username", (q: any) => q.eq("username", usernameFromIdentity(identity)))
     .unique();
     
   return user?.role === "school_admin" || user?.role === "platform_admin";
@@ -42,10 +43,9 @@ export const inviteUser = action({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    const adminUser: { organizationId?: Id<"organizations"> } | null = await ctx.runQuery(
-      internal.users.getUserByUsername,
-      { username: identity.tokenIdentifier }
-    );
+    const adminUser = await ctx.runQuery(internal.users.getUserByUsername, {
+      username: usernameFromIdentity(identity),
+    });
 
     if (!adminUser || !adminUser.organizationId) throw new Error("Admin user not found");
 
@@ -80,6 +80,15 @@ export const inviteUser = action({
     await ctx.runAction(internal.stream.upsertStreamUser, {
       userId: streamUserId,
       displayName: args.displayName,
+    });
+
+    await ctx.runMutation(internal.auditLog.logAction, {
+      organizationId: adminUser.organizationId,
+      actorId: adminUser._id,
+      action: "user_invited",
+      targetId: userId,
+      targetType: "user",
+      metadata: JSON.stringify({ role: args.role }),
     });
 
     return { success: true, userId };
@@ -148,7 +157,7 @@ export const getAllClasses = query({
 
     const adminUser = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!adminUser || !adminUser.organizationId) throw new Error("Admin user not found");
@@ -204,7 +213,7 @@ export const getAllUsers = query({
 
     const adminUser = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", identity.tokenIdentifier))
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
       .unique();
 
     if (!adminUser || !adminUser.organizationId) throw new Error("Admin user not found");
@@ -241,7 +250,22 @@ export const deactivateUser = mutation({
     const user = await ctx.db.get(args.userId);
     if (!user) throw new Error("User not found");
 
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const adminUser = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+    if (!adminUser?.organizationId) throw new Error("Admin user not found");
+
     await ctx.db.patch(args.userId, { isActive: false });
+    await ctx.runMutation(internal.auditLog.logAction, {
+      organizationId: adminUser.organizationId,
+      actorId: adminUser._id,
+      action: "user_deactivated",
+      targetId: args.userId,
+      targetType: "user",
+    });
     return null;
   },
 });
@@ -258,7 +282,22 @@ export const reactivateUser = mutation({
     const user = await ctx.db.get(args.userId);
     if (!user) throw new Error("User not found");
 
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const adminUser = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+    if (!adminUser?.organizationId) throw new Error("Admin user not found");
+
     await ctx.db.patch(args.userId, { isActive: true });
+    await ctx.runMutation(internal.auditLog.logAction, {
+      organizationId: adminUser.organizationId,
+      actorId: adminUser._id,
+      action: "user_reactivated",
+      targetId: args.userId,
+      targetType: "user",
+    });
     return null;
   },
 });
