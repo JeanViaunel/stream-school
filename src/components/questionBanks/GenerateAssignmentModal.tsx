@@ -17,33 +17,26 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
+  DialogTitle
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   BookOpen,
-  GraduationCap,
-  Tag,
-  FileQuestion,
   Check,
   AlertCircle,
   Shuffle,
-  SlidersHorizontal,
   ChevronRight,
   ChevronLeft,
-  Sparkles,
+  Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "@/components/ui/popover";
 
 interface GenerateAssignmentModalProps {
   classId: Id<"classes">;
@@ -65,30 +58,41 @@ export function GenerateAssignmentModal({
   organizationId,
   open,
   onOpenChange,
-  onSuccess,
+  onSuccess
 }: GenerateAssignmentModalProps) {
   const [step, setStep] = useState(1);
-  const [selectedBankId, setSelectedBankId] = useState<Id<"questionBanks"> | null>(null);
+  const [selectedBankId, setSelectedBankId] =
+    useState<Id<"questionBanks"> | null>(null);
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [questionCount, setQuestionCount] = useState(10);
-  const [useDifficultyDistribution, setUseDifficultyDistribution] = useState(false);
+  const [useDifficultyDistribution, setUseDifficultyDistribution] =
+    useState(false);
   const [easyPercent, setEasyPercent] = useState(30);
   const [mediumPercent, setMediumPercent] = useState(50);
   const [hardPercent, setHardPercent] = useState(20);
-  const [selectedQuestions, setSelectedQuestions] = useState<SelectedQuestion[]>([]);
+  const [selectedQuestions, setSelectedQuestions] = useState<
+    SelectedQuestion[]
+  >([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const banks = useQuery(api.questionBanks.getQuestionBanks, { organizationId });
+  const banks = useQuery(api.questionBanks.getQuestionBanks, {
+    organizationId
+  });
   const bankItems = useQuery(
     api.questionBanks.getQuestionBankItems,
     selectedBankId ? { bankId: selectedBankId } : "skip"
   );
 
-  const generateAssignment = useMutation(api.questionBanks.generateAssignmentFromBank);
+  const generateAssignment = useMutation(
+    api.questionBanks.generateAssignmentFromBank
+  );
 
   const selectedBank = banks?.find((b) => b._id === selectedBankId);
+
+  const sliderNumber = (v: number | readonly number[]): number =>
+    typeof v === "number" ? v : (v[0] ?? 0);
 
   const totalPercent = easyPercent + mediumPercent + hardPercent;
   const isDistributionValid = totalPercent === 100;
@@ -100,31 +104,47 @@ export function GenerateAssignmentModal({
 
   const handleToggleQuestion = (questionId: string) => {
     setSelectedQuestions((prev) =>
-      prev.map((q) => (q.id === questionId ? { ...q, selected: !q.selected } : q))
+      prev.map((q) =>
+        q.id === questionId ? { ...q, selected: !q.selected } : q
+      )
     );
   };
 
   const handleRandomSelection = () => {
     if (!bankItems) return;
-    
+
     let questionsToSelect: typeof bankItems;
-    
+
     if (useDifficultyDistribution && isDistributionValid) {
       const easyCount = Math.round((easyPercent / 100) * questionCount);
       const mediumCount = Math.round((mediumPercent / 100) * questionCount);
       const hardCount = questionCount - easyCount - mediumCount;
 
-      const easyItems = bankItems.filter((i) => i.question.difficulty === "easy");
-      const mediumItems = bankItems.filter((i) => i.question.difficulty === "medium");
-      const hardItems = bankItems.filter((i) => i.question.difficulty === "hard");
+      const easyItems = bankItems.filter(
+        (i) => i.question.difficulty === "easy"
+      );
+      const mediumItems = bankItems.filter(
+        (i) => i.question.difficulty === "medium"
+      );
+      const hardItems = bankItems.filter(
+        (i) => i.question.difficulty === "hard"
+      );
 
-      const shuffled = [...bankItems].sort(() => Math.random() - 0.5);
-      
+      const shuffled = [...easyItems, ...mediumItems, ...hardItems].sort(
+        () => Math.random() - 0.5
+      );
+
       // Select based on distribution
       const selected = [
-        ...shuffled.filter((i) => i.question.difficulty === "easy").slice(0, easyCount),
-        ...shuffled.filter((i) => i.question.difficulty === "medium").slice(0, mediumCount),
-        ...shuffled.filter((i) => i.question.difficulty === "hard").slice(0, hardCount),
+        ...shuffled
+          .filter((i) => i.question.difficulty === "easy")
+          .slice(0, easyCount),
+        ...shuffled
+          .filter((i) => i.question.difficulty === "medium")
+          .slice(0, mediumCount),
+        ...shuffled
+          .filter((i) => i.question.difficulty === "hard")
+          .slice(0, hardCount)
       ];
 
       // If we don't have enough with distribution, fill randomly
@@ -136,7 +156,9 @@ export function GenerateAssignmentModal({
       questionsToSelect = selected.slice(0, questionCount);
     } else {
       // Pure random selection
-      questionsToSelect = [...bankItems].sort(() => Math.random() - 0.5).slice(0, questionCount);
+      questionsToSelect = [...bankItems]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, questionCount);
     }
 
     const selectedIds = new Set(questionsToSelect.map((q) => q.question.id));
@@ -150,7 +172,9 @@ export function GenerateAssignmentModal({
 
     setIsGenerating(true);
     try {
-      const selectedIds = selectedQuestions.filter((q) => q.selected).map((q) => q.id);
+      const selectedIds = selectedQuestions
+        .filter((q) => q.selected)
+        .map((q) => q.id);
 
       const assignmentId = await generateAssignment({
         bankId: selectedBankId,
@@ -158,15 +182,16 @@ export function GenerateAssignmentModal({
         title: title || `Assignment from ${selectedBank?.name}`,
         instructions: instructions || "",
         questionCount,
-        difficultyDistribution: useDifficultyDistribution && isDistributionValid
-          ? {
-              easy: Math.round((easyPercent / 100) * questionCount),
-              medium: Math.round((mediumPercent / 100) * questionCount),
-              hard: Math.round((hardPercent / 100) * questionCount),
-            }
-          : undefined,
+        difficultyDistribution:
+          useDifficultyDistribution && isDistributionValid
+            ? {
+                easy: Math.round((easyPercent / 100) * questionCount),
+                medium: Math.round((mediumPercent / 100) * questionCount),
+                hard: Math.round((hardPercent / 100) * questionCount)
+              }
+            : undefined,
         selectedQuestionIds: selectedIds.length > 0 ? selectedIds : undefined,
-        dueDateAt: dueDate?.getTime(),
+        dueDateAt: dueDate?.getTime()
       });
 
       onSuccess?.(assignmentId);
@@ -201,7 +226,7 @@ export function GenerateAssignmentModal({
           id: item.question.id,
           text: item.question.text,
           difficulty: item.question.difficulty,
-          selected: false,
+          selected: false
         }))
       );
     }
@@ -315,7 +340,9 @@ export function GenerateAssignmentModal({
               {banks?.length === 0 && (
                 <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
                   <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-muted-foreground">No question banks available</p>
+                  <p className="text-muted-foreground">
+                    No question banks available
+                  </p>
                   <p className="text-sm text-muted-foreground mt-1">
                     Create a question bank first to generate assignments
                   </p>
@@ -394,7 +421,7 @@ export function GenerateAssignmentModal({
                   </div>
                   <Slider
                     value={[questionCount]}
-                    onValueChange={(v) => setQuestionCount(v[0])}
+                    onValueChange={(v) => setQuestionCount(sliderNumber(v))}
                     min={1}
                     max={selectedBank.questionCount}
                     step={1}
@@ -422,7 +449,10 @@ export function GenerateAssignmentModal({
                     {!isDistributionValid && (
                       <div className="flex items-center gap-2 text-sm text-destructive">
                         <AlertCircle className="h-4 w-4" />
-                        <span>Percentages must total 100% (currently {totalPercent}%)</span>
+                        <span>
+                          Percentages must total 100% (currently {totalPercent}
+                          %)
+                        </span>
                       </div>
                     )}
 
@@ -433,11 +463,11 @@ export function GenerateAssignmentModal({
                       </div>
                       <Slider
                         value={[easyPercent]}
-                        onValueChange={(v) => setEasyPercent(v[0])}
+                        onValueChange={(v) => setEasyPercent(sliderNumber(v))}
                         min={0}
                         max={100}
                         step={5}
-                        className="[&_[role=slider]]:bg-green-500"
+                        className="**:[[role=slider]]:bg-linear-to-r from-green-500 to-green-600"
                       />
                     </div>
 
@@ -448,11 +478,11 @@ export function GenerateAssignmentModal({
                       </div>
                       <Slider
                         value={[mediumPercent]}
-                        onValueChange={(v) => setMediumPercent(v[0])}
+                        onValueChange={(v) => setMediumPercent(sliderNumber(v))}
                         min={0}
                         max={100}
                         step={5}
-                        className="[&_[role=slider]]:bg-yellow-500"
+                        className="**:[[role=slider]]:bg-yellow-500"
                       />
                     </div>
 
@@ -463,11 +493,11 @@ export function GenerateAssignmentModal({
                       </div>
                       <Slider
                         value={[hardPercent]}
-                        onValueChange={(v) => setHardPercent(v[0])}
+                        onValueChange={(v) => setHardPercent(sliderNumber(v))}
                         min={0}
                         max={100}
                         step={5}
-                        className="[&_[role=slider]]:bg-red-500"
+                        className="**:[[role=slider]]:bg-red-500"
                       />
                     </div>
                   </div>
@@ -488,10 +518,12 @@ export function GenerateAssignmentModal({
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Select Questions</h3>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary">
-                    {selectedCount} selected
-                  </Badge>
-                  <Button variant="outline" size="sm" onClick={handleRandomSelection}>
+                  <Badge variant="secondary">{selectedCount} selected</Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRandomSelection}
+                  >
                     <Shuffle className="mr-2 h-4 w-4" />
                     Random Select
                   </Button>
@@ -511,7 +543,9 @@ export function GenerateAssignmentModal({
                     <CardContent className="p-3 flex items-start gap-3">
                       <Checkbox
                         checked={question.selected}
-                        onCheckedChange={() => handleToggleQuestion(question.id)}
+                        onCheckedChange={() =>
+                          handleToggleQuestion(question.id)
+                        }
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1 min-w-0">
@@ -520,7 +554,10 @@ export function GenerateAssignmentModal({
                           {question.difficulty && (
                             <Badge
                               variant="secondary"
-                              className={cn("text-xs", getDifficultyColor(question.difficulty))}
+                              className={cn(
+                                "text-xs",
+                                getDifficultyColor(question.difficulty)
+                              )}
                             >
                               {question.difficulty}
                             </Badge>
@@ -565,7 +602,9 @@ export function GenerateAssignmentModal({
                 onClick={() => setStep(step + 1)}
                 disabled={
                   (step === 1 && !selectedBankId) ||
-                  (step === 2 && (!title.trim() || (useDifficultyDistribution && !isDistributionValid)))
+                  (step === 2 &&
+                    (!title.trim() ||
+                      (useDifficultyDistribution && !isDistributionValid)))
                 }
               >
                 Next

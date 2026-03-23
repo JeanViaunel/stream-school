@@ -6,7 +6,9 @@ import {
   useCallStateHooks,
   RecordCallButton,
   RecordCallConfirmationButton,
-  DeviceSettings,
+  DeviceSelectorVideo,
+  DeviceSelectorAudioInput,
+  DeviceSelectorAudioOutput,
 } from "@stream-io/video-react-sdk";
 import {
   Mic,
@@ -181,7 +183,7 @@ function LayoutSwitcher({ currentLayout, onLayoutChange }: LayoutSwitcherProps) 
   );
 }
 
-// Device Settings Button Component - uses Stream SDK's DeviceSettings
+/** Stream's `DeviceSettings` is a nested menu toggle (icon-only until clicked). Use selectors directly so the dialog shows camera/mic/speaker immediately. */
 function DeviceSettingsButton() {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -208,7 +210,7 @@ function DeviceSettingsButton() {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      
+
       <DialogContent className="sm:max-w-md glass-strong border-white/10 bg-slate-900/95">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
@@ -216,9 +218,29 @@ function DeviceSettingsButton() {
             Call Settings
           </DialogTitle>
         </DialogHeader>
-        
-        <div className="py-4">
-          <DeviceSettings />
+
+        <div className="str-video__device-settings space-y-5 py-2 text-white">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-white/60 uppercase tracking-wider">
+              Camera
+            </p>
+            <DeviceSelectorVideo visualType="dropdown" />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-white/60 uppercase tracking-wider">
+              Microphone
+            </p>
+            <DeviceSelectorAudioInput
+              visualType="dropdown"
+              volumeIndicatorVisible
+            />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-white/60 uppercase tracking-wider">
+              Speakers
+            </p>
+            <DeviceSelectorAudioOutput visualType="dropdown" />
+          </div>
         </div>
       </DialogContent>
     </Dialog>

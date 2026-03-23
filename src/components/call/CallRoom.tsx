@@ -10,7 +10,7 @@ import {
   useCall,
   type Call,
   CallingState,
-  BackgroundFiltersProvider,
+  BackgroundFiltersProvider
 } from "@stream-io/video-react-sdk";
 import { toast } from "sonner";
 import { Users, Clock, Hash } from "lucide-react";
@@ -63,25 +63,25 @@ interface CallRoomProps {
 
 // Inner component that uses Stream SDK hooks (must be inside StreamCall)
 function CallRoomInner({ onLeave }: { onLeave: () => void }) {
-  const { useParticipants, useLocalParticipant, useCallCallingState } = useCallStateHooks();
+  const { useParticipants, useLocalParticipant, useCallCallingState } =
+    useCallStateHooks();
   const participants = useParticipants();
   const localParticipant = useLocalParticipant();
   const callingState = useCallCallingState();
   const call = useCall();
   const [layout, setLayout] = useState<CallLayout>("spotlight");
   const [showParticipants, setShowParticipants] = useState(false);
-  const [showChat, setShowChat] = useState(false);
+
   const [showCallEnded, setShowCallEnded] = useState(false);
   const [callEnded, setCallEnded] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
-  const [networkQuality, setNetworkQuality] = useState<
-    "excellent" | "good" | "poor"
-  >("excellent");
   const [headerVisible, setHeaderVisible] = useState(true);
   const lastMouseMoveRef = useRef(Date.now());
   const headerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Tracks remote participants across renders so we can detect who left
-  const prevRemoteRef = useRef<Map<string, { name?: string; userId: string }>>(new Map());
+  const prevRemoteRef = useRef<Map<string, { name?: string; userId: string }>>(
+    new Map()
+  );
   const [showRinging, setShowRinging] = useState(false);
 
   // Show a sonner toast when a remote participant leaves
@@ -90,7 +90,10 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
       (p) => p.sessionId !== localParticipant?.sessionId
     );
     const current = new Map(
-      remoteParticipants.map((p) => [p.sessionId, { name: p.name, userId: p.userId }])
+      remoteParticipants.map((p) => [
+        p.sessionId,
+        { name: p.name, userId: p.userId }
+      ])
     );
 
     prevRemoteRef.current.forEach((info, sessionId) => {
@@ -186,7 +189,7 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
     const layoutProps = {
       className: "w-full h-full",
       // Local video is shown in SelfView (PiP); omit local from grid/speaker to avoid duplicate camera tiles.
-      excludeLocalParticipant: true,
+      excludeLocalParticipant: true
     };
     switch (layout) {
       case "grid":
@@ -216,34 +219,52 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
   }
 
   // Show ringing/lobby UI while in RINGING state
-  if (showRinging || callingState === CallingState.RINGING || callingState === CallingState.JOINING) {
+  if (
+    showRinging ||
+    callingState === CallingState.RINGING ||
+    callingState === CallingState.JOINING
+  ) {
     return (
       <div className="fixed inset-0 bg-slate-950 flex items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/50 via-slate-950 to-purple-950/30" />
-        
+        <div className="absolute inset-0 bg-linear-to-br from-indigo-950/50 via-slate-950 to-purple-950/30" />
+
         <div className="relative z-10 text-center space-y-6">
           {/* Animated rings */}
           <div className="relative flex justify-center">
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="absolute h-40 w-40 rounded-full border-2 border-purple-500/20 animate-ring-pulse" />
-              <div className="absolute h-48 w-48 rounded-full border border-purple-500/10 animate-ring-pulse" style={{ animationDelay: "0.3s" }} />
-              <div className="absolute h-56 w-56 rounded-full border border-purple-500/5 animate-ring-pulse" style={{ animationDelay: "0.6s" }} />
+              <div
+                className="absolute h-48 w-48 rounded-full border border-purple-500/10 animate-ring-pulse"
+                style={{ animationDelay: "0.3s" }}
+              />
+              <div
+                className="absolute h-56 w-56 rounded-full border border-purple-500/5 animate-ring-pulse"
+                style={{ animationDelay: "0.6s" }}
+              />
             </div>
-            
-            <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-purple-500/30 to-indigo-500/30 border-2 border-purple-500/40 shadow-2xl shadow-purple-500/20">
-              <span className="text-3xl font-bold text-white" style={{ fontFamily: "var(--font-syne)" }}>
+
+            <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-linear-to-br from-purple-500/30 to-indigo-500/30 border-2 border-purple-500/40 shadow-2xl shadow-purple-500/20">
+              <span
+                className="text-3xl font-bold text-white"
+                style={{ fontFamily: "var(--font-syne)" }}
+              >
                 📞
               </span>
             </div>
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "var(--font-syne)" }}>
-              {callingState === CallingState.RINGING ? "Ringing..." : "Joining call..."}
+            <h2
+              className="text-2xl font-bold text-white"
+              style={{ fontFamily: "var(--font-syne)" }}
+            >
+              {callingState === CallingState.RINGING
+                ? "Ringing..."
+                : "Joining call..."}
             </h2>
             <p className="text-white/50">
-              {callingState === CallingState.RINGING 
-                ? "Waiting for others to answer" 
+              {callingState === CallingState.RINGING
+                ? "Waiting for others to answer"
                 : "Connecting to the call"}
             </p>
           </div>
@@ -305,13 +326,13 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
                 {participants.length}
               </span>
             </div>
-            <NetworkIndicator quality={networkQuality} />
+            <NetworkIndicator quality="excellent" />
           </div>
         </div>
       </div>
 
       {/* Network quality banner */}
-      <NetworkBanner quality={networkQuality} />
+      <NetworkBanner quality="excellent" />
 
       {/* Main video area */}
       <StreamTheme className="relative w-full h-full bg-transparent">
@@ -319,8 +340,7 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
           <div
             className={cn(
               "w-full h-full max-w-7xl mx-auto transition-all duration-400",
-              showParticipants && "mr-80",
-              showChat && "ml-80"
+              showParticipants && "mr-80"
             )}
           >
             <div className="w-full h-full rounded-2xl overflow-hidden">
@@ -345,12 +365,8 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
       {/* Floating controls */}
       <FloatingControls
         onLeave={handleLeave}
-        onToggleParticipants={() => setShowParticipants(!showParticipants)}
-        onToggleChat={() => setShowChat(!showChat)}
         currentLayout={layout}
         onLayoutChange={setLayout}
-        isParticipantsOpen={showParticipants}
-        isChatOpen={showChat}
       />
     </div>
   );
@@ -365,7 +381,7 @@ export function CallRoom({ call, onLeave }: CallRoomProps) {
           "/backgrounds/office.svg",
           "/backgrounds/library.svg",
           "/backgrounds/nature.svg",
-          "/backgrounds/space.svg",
+          "/backgrounds/space.svg"
         ]}
         onError={(error) => {
           console.error("Background filter error:", error);

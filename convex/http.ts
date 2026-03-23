@@ -92,7 +92,7 @@ http.route({
       console.log(`Recording ready for call: ${call_cid}, filename: ${filename}`);
       
       // Store recording via internal action (downloads from Stream URL and uploads to S3)
-      const storeResult = await ctx.runAction(internal.recordings.storeRecording, {
+      const storeResult = await ctx.runAction(internal.recordingsNode.storeRecording, {
         recordingUrl: url,
         callId: call_cid,
         filename: filename,

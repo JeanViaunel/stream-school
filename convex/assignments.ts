@@ -1,12 +1,8 @@
-"use node";
-
 import { mutation, query, action } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { usernameFromIdentity } from "./authHelpers";
 import { api } from "./_generated/api";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const createAssignment = mutation({
   args: {

@@ -11,7 +11,7 @@ import {
   useCallStateHooks,
   Call,
   CallingState,
-  BackgroundFiltersProvider,
+  BackgroundFiltersProvider
 } from "@stream-io/video-react-sdk";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
@@ -40,7 +40,6 @@ interface PendingUser {
 interface ClassCallRoomInnerProps {
   isTeacher: boolean;
   className: string;
-  teacherName: string;
   pendingUsers: PendingUser[];
   onAdmit: (userId: string) => Promise<void>;
   onDeny: (userId: string) => Promise<void>;
@@ -52,26 +51,21 @@ interface ClassCallRoomInnerProps {
 
 function ClassCallRoomInner({
   isTeacher,
-  className,
-  teacherName,
   pendingUsers,
-  addPendingIfNew,
   onAdmit,
   onDeny,
   onMuteAll,
   onLeave,
   onEndForAll,
-  activeSessionId,
+  activeSessionId
 }: ClassCallRoomInnerProps & { activeSessionId?: Id<"sessions"> }) {
   const {
     useCallCallingState,
     useParticipants,
-    useRemoteParticipants,
     useCameraState,
     useMicrophoneState,
-    useScreenShareState,
+    useScreenShareState
   } = useCallStateHooks();
-  const remoteParticipants = useRemoteParticipants();
   const callingState = useCallCallingState();
   const participants = useParticipants();
   const { camera } = useCameraState();
@@ -80,7 +74,7 @@ function ClassCallRoomInner({
   const call = useCall();
   const { gradeBand } = useGradeSkin();
   const isPrimaryBand = gradeBand === "primary";
-  
+
   // Layout state - managed here and passed to controls
   const [currentLayout, setCurrentLayout] = useState<CallLayout>("spotlight");
 
@@ -98,17 +92,6 @@ function ClassCallRoomInner({
   useEffect(() => {
     lastParticipantCountRef.current = participants.length;
   }, [participants]);
-
-  // Teacher: when remote participants appear in reactive state, queue them for admit + toast.
-  // This complements call.session_participant_joined (some clients miss or filter WS events).
-  useEffect(() => {
-    if (!isTeacher) return;
-    for (const p of remoteParticipants) {
-      const streamUserId = p.userId;
-      if (!streamUserId) continue;
-      addPendingIfNew(streamUserId, p.name ?? streamUserId);
-    }
-  }, [isTeacher, remoteParticipants, addPendingIfNew]);
 
   // Track call duration while joined
   useEffect(() => {
@@ -160,34 +143,52 @@ function ClassCallRoomInner({
   }
 
   // Show ringing/lobby UI while in RINGING state
-  if (showRinging || callingState === CallingState.RINGING || callingState === CallingState.JOINING) {
+  if (
+    showRinging ||
+    callingState === CallingState.RINGING ||
+    callingState === CallingState.JOINING
+  ) {
     return (
       <div className="fixed inset-0 bg-slate-950 flex items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/50 via-slate-950 to-purple-950/30" />
-        
+        <div className="absolute inset-0 bg-linear-to-br from-indigo-950/50 via-slate-950 to-purple-950/30" />
+
         <div className="relative z-10 text-center space-y-6">
           {/* Animated rings */}
           <div className="relative flex justify-center">
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="absolute h-40 w-40 rounded-full border-2 border-purple-500/20 animate-ring-pulse" />
-              <div className="absolute h-48 w-48 rounded-full border border-purple-500/10 animate-ring-pulse" style={{ animationDelay: "0.3s" }} />
-              <div className="absolute h-56 w-56 rounded-full border border-purple-500/5 animate-ring-pulse" style={{ animationDelay: "0.6s" }} />
+              <div
+                className="absolute h-48 w-48 rounded-full border border-purple-500/10 animate-ring-pulse"
+                style={{ animationDelay: "0.3s" }}
+              />
+              <div
+                className="absolute h-56 w-56 rounded-full border border-purple-500/5 animate-ring-pulse"
+                style={{ animationDelay: "0.6s" }}
+              />
             </div>
-            
-            <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-purple-500/30 to-indigo-500/30 border-2 border-purple-500/40 shadow-2xl shadow-purple-500/20">
-              <span className="text-3xl font-bold text-white" style={{ fontFamily: "var(--font-syne)" }}>
+
+            <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-linear-to-br from-purple-500/30 to-indigo-500/30 border-2 border-purple-500/40 shadow-2xl shadow-purple-500/20">
+              <span
+                className="text-3xl font-bold text-white"
+                style={{ fontFamily: "var(--font-syne)" }}
+              >
                 📞
               </span>
             </div>
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "var(--font-syne)" }}>
-              {callingState === CallingState.RINGING ? "Ringing..." : "Joining classroom..."}
+            <h2
+              className="text-2xl font-bold text-white"
+              style={{ fontFamily: "var(--font-syne)" }}
+            >
+              {callingState === CallingState.RINGING
+                ? "Ringing..."
+                : "Joining classroom..."}
             </h2>
             <p className="text-white/50">
-              {callingState === CallingState.RINGING 
-                ? "Waiting for others to answer" 
+              {callingState === CallingState.RINGING
+                ? "Waiting for others to answer"
                 : "Connecting to the classroom"}
             </p>
           </div>
@@ -212,7 +213,9 @@ function ClassCallRoomInner({
       case "grid":
         return <PaginatedGridLayout key="grid-layout" />;
       case "sidebar":
-        return <SpeakerLayout key="sidebar-layout" participantsBarPosition="left" />;
+        return (
+          <SpeakerLayout key="sidebar-layout" participantsBarPosition="left" />
+        );
       case "spotlight":
       default:
         return <SpeakerLayout key="spotlight-layout" />;
@@ -222,12 +225,12 @@ function ClassCallRoomInner({
   return (
     <div className="relative h-full bg-slate-950">
       <StreamTheme className="relative w-full h-full bg-transparent">
-        <div 
+        <div
           ref={screenShareContainerRef}
           className="absolute inset-0 flex items-center justify-center pb-24"
         >
           {renderLayout()}
-          
+
           {/* Screen Share Annotation Overlay */}
           {isScreenSharing && activeSessionId && (
             <ScreenShareAnnotation
@@ -304,128 +307,162 @@ export function ClassCallRoom({
   className,
   teacherName,
   teacherId,
-  onLeave,
+  onLeave
 }: ClassCallRoomProps) {
   const { session } = useAuth();
+  const isTeacher = session?.userId === teacherId;
   const client = useStreamVideoClient();
   const createSession = useMutation(api.sessions.createSession);
   const endSessionMutation = useMutation(api.sessions.endSession);
-  const activeSession = useQuery(api.sessions.getActiveSessionForClass, { classId });
+  const requestLobbyAccess = useMutation(api.sessions.requestLobbyAccess);
+  const admitLobbyRequest = useMutation(api.sessions.admitLobbyRequest);
+  const denyLobbyRequest = useMutation(api.sessions.denyLobbyRequest);
+  const activeSession = useQuery(api.sessions.getActiveSessionForClass, {
+    classId
+  });
+  const lobbyPending = useQuery(
+    api.sessions.listPendingLobbyForSession,
+    isTeacher && activeSession?._id ? { sessionId: activeSession._id } : "skip"
+  );
+  const myLobbyRequest = useQuery(
+    api.sessions.getMyLobbyRequestForSession,
+    !isTeacher && activeSession?._id ? { sessionId: activeSession._id } : "skip"
+  );
   const [call, setCall] = useState<Call | null>(null);
   const [isJoining, setIsJoining] = useState(false);
+  const [isEnteringClassroom, setIsEnteringClassroom] = useState(false);
   const [isInLobby, setIsInLobby] = useState(false);
-  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
-  const isTeacher = session?.userId === teacherId;
-  const hasJoinedRef = useRef(false);
+  const teacherInitRef = useRef(false);
+  const studentLobbyInitRef = useRef(false);
+  const studentJoinedAfterAdmitRef = useRef(false);
+  const deniedDismissRef = useRef(false);
 
-  const addPendingIfNew = useCallback(
-    (streamUserId: string, displayName: string) => {
-      if (!streamUserId || streamUserId === session?.streamUserId) return;
-      setPendingUsers((prev) => {
-        if (prev.some((u) => u.id === streamUserId)) return prev;
-        toast.info(`${displayName || "A participant"} is waiting to join`);
-        return [
-          ...prev,
-          {
-            id: streamUserId,
-            name: displayName || streamUserId,
-            streamUserId,
-          },
-        ];
-      });
-    },
-    [session?.streamUserId]
-  );
+  const pendingUsers: PendingUser[] = useMemo(() => {
+    if (!lobbyPending) return [];
+    return lobbyPending.map((r) => ({
+      id: r.streamUserId,
+      streamUserId: r.streamUserId,
+      name: r.displayName,
+      requestId: r._id
+    }));
+  }, [lobbyPending]);
 
   useEffect(() => {
-    if (!client || activeSession === undefined || hasJoinedRef.current) return;
-
-    const joinCall = async () => {
-      hasJoinedRef.current = true;
-      setIsJoining(true);
-      try {
-        const callInstance = client.call("default", callId);
-
-        if (isTeacher) {
+    if (!client || activeSession === undefined) return;
+    if (isTeacher) {
+      if (teacherInitRef.current) return;
+      teacherInitRef.current = true;
+      const run = async () => {
+        setIsJoining(true);
+        try {
+          const callInstance = client.call("default", callId);
           await callInstance.join({ create: true });
 
-          // Track who has actually joined this classroom call in the call custom
-          // state so chat call cards can correctly show "Call ended" vs "Missed call".
           if (session?.streamUserId) {
             try {
-              const custom = callInstance.state.custom as Record<string, unknown> | undefined;
-              const joinedParticipants = (custom?.joinedParticipants as string[] | undefined) ?? [];
+              const custom = callInstance.state.custom as
+                | Record<string, unknown>
+                | undefined;
+              const joinedParticipants =
+                (custom?.joinedParticipants as string[] | undefined) ?? [];
               if (!joinedParticipants.includes(session.streamUserId)) {
                 await callInstance.update({
                   custom: {
-                    joinedParticipants: [...joinedParticipants, session.streamUserId],
-                  },
+                    joinedParticipants: [
+                      ...joinedParticipants,
+                      session.streamUserId
+                    ]
+                  }
                 });
               }
             } catch {
-              // Best effort: don't block call join if custom state update fails.
+              // Best effort
             }
           }
 
-          // Only create the Convex session record if one doesn't already exist for this class
           if (!activeSession) {
             await createSession({
               classId,
               hostId: session!.userId as Id<"users">,
-              streamCallId: callId,
+              streamCallId: callId
             });
           }
-        } else {
-          // For students: disable camera initially but allow them to enable later
-          await callInstance.camera.disable();
-          await callInstance.microphone.disable();
-          await callInstance.join();
-          setIsInLobby(true);
+          setCall(callInstance);
+        } catch (err) {
+          teacherInitRef.current = false;
+          toast.error("Failed to join call");
+          console.error(err);
+        } finally {
+          setIsJoining(false);
         }
+      };
+      void run();
+      return () => {
+        call?.leave().catch(() => {});
+      };
+    }
 
+    // Student: wait until the teacher has started a Convex session, then watch the call (no SFU join yet).
+    if (activeSession === null) return;
+    if (!session?.streamUserId) return;
+    if (studentLobbyInitRef.current) return;
+    studentLobbyInitRef.current = true;
+
+    const runStudent = async () => {
+      setIsJoining(true);
+      try {
+        const callInstance = client.call("default", callId);
+        await callInstance.get();
+        await requestLobbyAccess({
+          sessionId: activeSession._id,
+          streamUserId: session.streamUserId,
+          displayName: session.displayName ?? "Student"
+        });
         setCall(callInstance);
+        setIsInLobby(true);
       } catch (err) {
-        toast.error("Failed to join call");
+        studentLobbyInitRef.current = false;
+        toast.error("Could not request to join the classroom");
         console.error(err);
       } finally {
         setIsJoining(false);
       }
     };
-
-    joinCall();
+    void runStudent();
 
     return () => {
-      if (call) {
-        call.leave().catch(() => {});
-      }
+      call?.leave().catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, callId, isTeacher, activeSession]);
 
-  // Teacher: listen for students joining the call session (subscribe to the concrete event).
+  /** Join must run from a user gesture (e.g. button); otherwise getUserMedia can fail with "prompting again is not allowed". */
+  const handleStudentEnterClassroom = useCallback(async () => {
+    if (!call || isTeacher) return;
+    if (!myLobbyRequest || myLobbyRequest.status !== "admitted") return;
+    if (studentJoinedAfterAdmitRef.current) return;
+    studentJoinedAfterAdmitRef.current = true;
+    setIsEnteringClassroom(true);
+    try {
+      await call.join();
+      setIsInLobby(false);
+    } catch (err) {
+      studentJoinedAfterAdmitRef.current = false;
+      toast.error("Failed to enter the classroom");
+      console.error(err);
+    } finally {
+      setIsEnteringClassroom(false);
+    }
+  }, [call, isTeacher, myLobbyRequest]);
+
   useEffect(() => {
-    if (!call || !isTeacher) return;
-
-    const handleSessionParticipantJoined = (event: {
-      type: string;
-      participant?: { user?: { id?: string; name?: string } };
-    }) => {
-      if (event.type !== "call.session_participant_joined") return;
-      const participant = event.participant;
-      const userId = participant?.user?.id;
-      if (!userId) return;
-      const userName = participant.user?.name ?? userId;
-      addPendingIfNew(userId, userName);
-    };
-
-    const unsubscribe = call.on(
-      "call.session_participant_joined",
-      handleSessionParticipantJoined
-    );
-    return () => {
-      unsubscribe();
-    };
-  }, [call, isTeacher, addPendingIfNew]);
+    if (!myLobbyRequest || myLobbyRequest.status !== "denied" || isTeacher)
+      return;
+    if (deniedDismissRef.current) return;
+    deniedDismissRef.current = true;
+    toast.error("The teacher did not admit you to this session");
+    onLeave();
+  }, [myLobbyRequest, isTeacher, onLeave]);
 
   // Student: listen for admission signal from the teacher
   useEffect(() => {
@@ -436,12 +473,13 @@ export function ClassCallRoom({
     const markJoined = async (streamUserId: string) => {
       try {
         const custom = call.state.custom as Record<string, unknown> | undefined;
-        const joinedParticipants = (custom?.joinedParticipants as string[] | undefined) ?? [];
+        const joinedParticipants =
+          (custom?.joinedParticipants as string[] | undefined) ?? [];
         if (!joinedParticipants.includes(streamUserId)) {
           await call.update({
             custom: {
-              joinedParticipants: [...joinedParticipants, streamUserId],
-            },
+              joinedParticipants: [...joinedParticipants, streamUserId]
+            }
           });
         }
       } catch {
@@ -463,7 +501,6 @@ export function ClassCallRoom({
         if (streamUserIdToMark) {
           await markJoined(streamUserIdToMark);
         }
-        setIsInLobby(false);
         return;
       }
       // Fallback: permissions_updated (fires if call type restricts permissions by default)
@@ -471,7 +508,6 @@ export function ClassCallRoom({
         if (myStreamUserId) {
           await markJoined(myStreamUserId);
         }
-        setIsInLobby(false);
       }
     };
 
@@ -479,17 +515,22 @@ export function ClassCallRoom({
     return () => {
       call.off("all", handleEvent);
     };
-  }, [call, isTeacher, client]);
+  }, [call, isTeacher, client, session?.streamUserId]);
 
   const handleAdmit = async (userId: string) => {
     if (!call) return;
+    const row = lobbyPending?.find((r) => r.streamUserId === userId);
     try {
-      await call.grantPermissions(userId, ["send-audio", "send-video"]).catch(() => {});
-      // Send a custom event as the reliable admission signal — grantPermissions is a
-      // no-op on the "default" call type (permissions already granted), so the
-      // "call.permissions_updated" event never fires for the student.
-      await call.sendCustomEvent({ type: "student-admitted", streamUserId: userId });
-      setPendingUsers((prev) => prev.filter((u) => u.id !== userId));
+      if (row) {
+        await admitLobbyRequest({ requestId: row._id });
+      }
+      await call
+        .grantPermissions(userId, ["send-audio", "send-video"])
+        .catch(() => {});
+      await call.sendCustomEvent({
+        type: "student-admitted",
+        streamUserId: userId
+      });
       toast.success("User admitted");
     } catch {
       toast.error("Failed to admit user");
@@ -498,9 +539,12 @@ export function ClassCallRoom({
 
   const handleDeny = async (userId: string) => {
     if (!call) return;
+    const row = lobbyPending?.find((r) => r.streamUserId === userId);
     try {
+      if (row) {
+        await denyLobbyRequest({ requestId: row._id });
+      }
       await call.blockUser(userId);
-      setPendingUsers((prev) => prev.filter((u) => u.id !== userId));
       toast.success("User removed");
     } catch {
       toast.error("Failed to remove user");
@@ -509,7 +553,9 @@ export function ClassCallRoom({
 
   const handleEndForAll = async () => {
     if (activeSession) {
-      await endSessionMutation({ sessionId: activeSession._id }).catch(() => {});
+      await endSessionMutation({ sessionId: activeSession._id }).catch(
+        () => {}
+      );
     }
     await call?.endCall().catch(() => {});
     onLeave();
@@ -525,10 +571,29 @@ export function ClassCallRoom({
     }
   };
 
+  if (activeSession === undefined) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   if (isJoining) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isTeacher && activeSession === null) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-center">
+        <p className="text-muted-foreground max-w-sm">
+          Waiting for the teacher to start this class session. Try again in a
+          moment.
+        </p>
       </div>
     );
   }
@@ -546,7 +611,11 @@ export function ClassCallRoom({
       <Lobby
         className={className}
         teacherName={teacherName}
-        onJoin={() => setIsInLobby(false)}
+        lobbyPhase={
+          myLobbyRequest?.status === "admitted" ? "admitted" : "waiting"
+        }
+        onEnterClassroom={handleStudentEnterClassroom}
+        isEnteringClassroom={isEnteringClassroom}
       />
     );
   }
@@ -559,7 +628,7 @@ export function ClassCallRoom({
           "/backgrounds/office.svg",
           "/backgrounds/library.svg",
           "/backgrounds/nature.svg",
-          "/backgrounds/space.svg",
+          "/backgrounds/space.svg"
         ]}
         onError={(error) => {
           console.error("Background filter error:", error);
@@ -568,9 +637,7 @@ export function ClassCallRoom({
         <ClassCallRoomInner
           isTeacher={isTeacher}
           className={className}
-          teacherName={teacherName}
           pendingUsers={pendingUsers}
-          addPendingIfNew={addPendingIfNew}
           onAdmit={handleAdmit}
           onDeny={handleDeny}
           onMuteAll={handleMuteAll}

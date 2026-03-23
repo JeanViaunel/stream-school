@@ -39,7 +39,6 @@ export function VirtualBackgroundToggle() {
     disableBackgroundFilter,
     applyBackgroundBlurFilter,
     applyBackgroundImageFilter,
-    backgroundImages,
     performance,
   } = useBackgroundFilters();
 
@@ -210,7 +209,7 @@ export function VirtualBackgroundToggle() {
                         />
                         
                         {/* Gradient overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent" />
                         
                         {/* Icon */}
                         <div className="absolute inset-0 flex items-center justify-center">
