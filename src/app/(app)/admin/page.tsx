@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   BarChart3,
   ScrollText,
+  Building2,
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -138,6 +139,26 @@ export default function AdminPage() {
 
       {/* Quick Actions */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5" />
+              Organization
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              School name, slug, branding, and org-wide policies (DMs, recording, limits).
+            </p>
+            <Link href="/admin/organization" className="flex-1">
+              <Button variant="outline" className="w-full">
+                Manage organization
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

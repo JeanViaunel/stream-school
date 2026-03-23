@@ -13,15 +13,15 @@ export default function CreateClassPage() {
   const { session } = useAuth();
   const [open, setOpen] = useState(true);
 
-  // Redirect non-teachers
+  // Redirect non-admins
   if (!session) return null;
 
-  if (session.role !== "teacher" && session.role !== "admin") {
+  if (session.role !== "admin") {
     return (
       <div className="w-full p-6">
         <Card>
           <CardContent className="p-8 text-center">
-            <p className="text-muted-foreground">Only teachers can create classes.</p>
+            <p className="text-muted-foreground">Only admins can create classes.</p>
             <Link href="/dashboard">
               <Button className="mt-4">Go to Dashboard</Button>
             </Link>

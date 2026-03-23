@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   BookOpen,
+  Building2,
   ScrollText,
   Shield,
   ShieldAlert,
@@ -21,6 +22,7 @@ type AdminNavItem = {
 
 const ADMIN_NAV: Array<AdminNavItem> = [
   { href: "/admin", label: "Dashboard", icon: Shield },
+  { href: "/admin/organization", label: "Organization", icon: Building2 },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/classes", label: "Classes", icon: BookOpen },
   { href: "/admin/moderation", label: "Moderation", icon: ShieldAlert },

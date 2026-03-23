@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useAction } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -26,15 +26,26 @@ import { CreateClassModal } from "@/components/class/CreateClassModal";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { session } = useAuth();
   const [joinCode, setJoinCode] = useState("");
   const [showJoinDialog, setShowJoinDialog] = useState(false);
   const [createClassOpen, setCreateClassOpen] = useState(false);
   
+  const teacherLikeRoles =
+    session?.role === "teacher" ||
+    session?.role === "co_teacher" ||
+    session?.role === "admin";
+
   const teacherClasses = useQuery(
     api.classes.getClassesByTeacher,
-    session?.role === "teacher" || session?.role === "admin" ? {} : "skip"
+    session?.role === "teacher" || session?.role === "co_teacher" ? {} : "skip",
+  );
+
+  const adminOrgClasses = useQuery(
+    api.admin.getAllClasses,
+    session?.role === "admin" ? {} : "skip",
   );
   
   const studentClasses = useQuery(
@@ -49,6 +60,20 @@ export default function DashboardPage() {
       setShowJoinDialog(true);
     }
   }, [searchParams]);
+
+  /** Avatar menu "My Classes" uses `/dashboard#my-classes` — scroll into view when hash is present. */
+  useEffect(() => {
+    if (pathname !== "/dashboard") return;
+    if (typeof window === "undefined" || window.location.hash !== "#my-classes") {
+      return;
+    }
+    const el = document.getElementById("my-classes");
+    if (!el) return;
+    const t = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => window.clearTimeout(t);
+  }, [pathname, session?.role, studentClasses, teacherClasses, adminOrgClasses]);
 
   const handleJoinClass = async () => {
     if (!joinCode.trim()) {
@@ -88,6 +113,11 @@ export default function DashboardPage() {
           <CalendarView />
         </div>
 
+        <section
+          id="my-classes"
+          className="scroll-mt-8"
+          aria-label="My classes"
+        >
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
           {studentClasses?.map((cls) => (
             <Link key={cls._id} href={`/class/${cls._id}`}>
@@ -160,32 +190,34 @@ export default function DashboardPage() {
             </DialogContent>
           </Dialog>
         </div>
+        </section>
       </div>
     );
   }
 
-  if (session.role === "teacher") {
+  if (session.role === "teacher" || session.role === "co_teacher") {
     return (
       <div className="container mx-auto p-6 max-w-6xl">
         <header className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2">
-              Teacher Dashboard
+              {session.role === "co_teacher" ? "Co-teacher Dashboard" : "Teacher Dashboard"}
             </h1>
             <p className="text-muted-foreground">
               Manage your classes and sessions
             </p>
           </div>
-          <Button onClick={() => setCreateClassOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Class
-            </Button>
         </header>
 
         <div className="mb-8">
           <CalendarView />
         </div>
 
+        <section
+          id="my-classes"
+          className="scroll-mt-8"
+          aria-label="My classes"
+        >
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
           {teacherClasses?.map((cls) => (
             <Link key={cls._id} href={`/class/${cls._id}`}>
@@ -213,26 +245,8 @@ export default function DashboardPage() {
               </Card>
             </Link>
           ))}
-
-          {/* Create class card */}
-          <button
-            type="button"
-            className="w-full"
-            onClick={() => setCreateClassOpen(true)}
-          >
-            <Card className="border-dashed hover:border-primary/50 cursor-pointer h-full">
-              <CardContent className="flex flex-col items-center justify-center h-full min-h-[200px] text-center">
-                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mb-3">
-                  <Plus className="w-6 h-6 text-muted-foreground" />
-                </div>
-                <p className="font-medium">Create New Class</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Set up a new class for your students
-                </p>
-              </CardContent>
-            </Card>
-          </button>
         </div>
+        </section>
         <CreateClassModal open={createClassOpen} onOpenChange={setCreateClassOpen} />
       </div>
     );
@@ -266,6 +280,9 @@ export default function DashboardPage() {
     );
   }
 
+  const adminActiveClasses =
+    adminOrgClasses?.filter((c) => !c.isArchived) ?? [];
+
   // Admin dashboard
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -291,7 +308,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {(teacherClasses?.length || 0) + (studentClasses?.length || 0)}
+              {adminActiveClasses.length}
             </div>
           </CardContent>
         </Card>
@@ -312,6 +329,56 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <section
+        id="my-classes"
+        className="scroll-mt-8 mt-10"
+        aria-label="Organization classes"
+      >
+        <h2 className="text-xl font-semibold mb-4">Classes</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+          {adminActiveClasses.map((cls) => (
+            <Link key={cls._id} href={`/class/${cls._id}`}>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <BookOpen className="w-6 h-6 text-primary" />
+                    </div>
+                    <Badge variant="secondary">Grade {cls.gradeLevel}</Badge>
+                  </div>
+                  <CardTitle className="mt-3">{cls.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground capitalize mb-4">
+                    {cls.subject}
+                  </p>
+                  {cls.teacherDisplayName && (
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Teacher: {cls.teacherDisplayName}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Hash className="w-3 h-3" />
+                      {cls.joinCode}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+        {adminActiveClasses.length === 0 && (
+          <p className="text-sm text-muted-foreground py-8 text-center">
+            No classes in your organization yet. Create one from the sidebar or{" "}
+            <Link href="/class/create" className="text-primary underline underline-offset-4">
+              create class
+            </Link>
+            .
+          </p>
+        )}
+      </section>
     </div>
   );
 }

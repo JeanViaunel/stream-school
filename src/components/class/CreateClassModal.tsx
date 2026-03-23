@@ -2,8 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
+import type { Id } from "@/../convex/_generated/dataModel";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,12 +33,23 @@ export function CreateClassModal({ open, onOpenChange }: Props) {
     name: "",
     subject: "",
     gradeLevel: "",
+    teacherId: "",
   });
 
   const createClass = useAction(api.classes.createClass);
 
-  const canCreate =
-    session?.role === "teacher" || session?.role === "admin";
+  const canCreate = session?.role === "admin";
+
+  const users = useQuery(
+    api.admin.getAllUsers,
+    session?.role === "admin" ? {} : "skip"
+  );
+  const teachers = users?.filter(
+    (u) =>
+      u.role === "teacher" ||
+      u.role === "co_teacher" ||
+      u.role === "admin",
+  );
 
   const handleClose = () => {
     onOpenChange(false);
@@ -52,8 +64,13 @@ export function CreateClassModal({ open, onOpenChange }: Props) {
       return;
     }
 
-    if (!formData.name || !formData.subject || !formData.gradeLevel) {
-      toast.error("Please fill in all fields");
+    if (
+      !formData.name ||
+      !formData.subject ||
+      !formData.gradeLevel ||
+      !formData.teacherId
+    ) {
+      toast.error("Please fill in all fields and select a teacher");
       return;
     }
 
@@ -63,6 +80,7 @@ export function CreateClassModal({ open, onOpenChange }: Props) {
         name: formData.name,
         subject: formData.subject,
         gradeLevel: parseInt(formData.gradeLevel),
+        teacherId: formData.teacherId as Id<"users">,
       });
 
       toast.success("Class created successfully!");
@@ -112,6 +130,33 @@ export function CreateClassModal({ open, onOpenChange }: Props) {
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                 disabled={isLoading || !canCreate}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="teacherId">Teacher</Label>
+              <Select
+                value={formData.teacherId}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, teacherId: value })
+                }
+                disabled={
+                  isLoading ||
+                  !canCreate ||
+                  !teachers ||
+                  teachers.length === 0
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select teacher" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teachers?.map((t) => (
+                    <SelectItem key={t._id} value={t._id}>
+                      {t.displayName} (@{t.username})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

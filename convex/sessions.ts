@@ -185,6 +185,10 @@ export const getAttendance = query({
     }
 
     const isTeacher = cls.teacherId === user._id;
+    const isOrgAdmin =
+      user.role === "admin" &&
+      !!user.organizationId &&
+      user.organizationId === cls.organizationId;
     const isEnrolled = await ctx.db
       .query("enrollments")
       .withIndex("by_class_and_student", (q) =>
@@ -192,7 +196,7 @@ export const getAttendance = query({
       )
       .unique();
 
-    if (!isTeacher && !isEnrolled) {
+    if (!isTeacher && !isOrgAdmin && !isEnrolled) {
       throw new Error("Not authorized to view attendance for this session");
     }
 
@@ -310,6 +314,10 @@ export const getSessionsByClass = query({
     }
 
     const isTeacher = cls.teacherId === user._id;
+    const isOrgAdmin =
+      user.role === "admin" &&
+      !!user.organizationId &&
+      user.organizationId === cls.organizationId;
     const isEnrolled = await ctx.db
       .query("enrollments")
       .withIndex("by_class_and_student", (q) =>
@@ -317,7 +325,7 @@ export const getSessionsByClass = query({
       )
       .unique();
 
-    if (!isTeacher && !isEnrolled) {
+    if (!isTeacher && !isOrgAdmin && !isEnrolled) {
       throw new Error("Not authorized to view sessions for this class");
     }
 

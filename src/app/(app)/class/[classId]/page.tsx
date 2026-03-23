@@ -122,6 +122,7 @@ export default function ClassPage() {
             streamChannelId: classData.streamChannelId,
             joinCode: classData.joinCode,
             teacherId: classData.teacherId,
+            isArchived: classData.isArchived,
             teacher: classData.teacher
               ? {
                   displayName: classData.teacher.displayName,
@@ -129,7 +130,7 @@ export default function ClassPage() {
                 }
               : undefined,
           }}
-          enrollmentCount={0}
+          enrollmentCount={classData.enrollmentCount}
           isActiveSession={false}
           onStartSession={handleStartSession}
           onJoinSession={handleJoinSession}

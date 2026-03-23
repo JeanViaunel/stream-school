@@ -19,17 +19,29 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { 
-  Users, 
-  Search, 
-  UserX, 
+import {
+  Users,
+  Search,
+  UserX,
   UserCheck,
   Plus,
   ArrowLeft,
-  Loader2
+  Loader2,
+  UserPlus,
+  UserMinus,
 } from "lucide-react";
 
 export default function AdminUsersPage() {
@@ -37,6 +49,12 @@ export default function AdminUsersPage() {
   const { session } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [showAddExistingDialog, setShowAddExistingDialog] = useState(false);
+  const [addExistingUsername, setAddExistingUsername] = useState("");
+  const [lookupUsernameKey, setLookupUsernameKey] = useState<string | null>(null);
+  const [isAddingToOrg, setIsAddingToOrg] = useState(false);
+  const [removeOrgUserId, setRemoveOrgUserId] = useState<Id<"users"> | null>(null);
+  const [isRemovingFromOrg, setIsRemovingFromOrg] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
 
   const ALL_ROLES = [
@@ -76,10 +94,24 @@ export default function AdminUsersPage() {
     session?.role === "admin" ? {} : "skip"
   );
 
+  const org = useQuery(
+    api.admin.getMyOrganization,
+    session?.role === "admin" ? {} : "skip"
+  );
+
+  const previewAddUser = useQuery(
+    api.admin.previewUserForAddToOrganization,
+    session?.role === "admin" && lookupUsernameKey !== null
+      ? { username: lookupUsernameKey }
+      : "skip"
+  );
+
   const inviteUser = useAction(api.admin.inviteUser);
   const deactivateUser = useMutation(api.admin.deactivateUser);
   const reactivateUser = useMutation(api.admin.reactivateUser);
   const updateUserRole = useMutation(api.admin.updateUserRole);
+  const addUserToOrganization = useMutation(api.admin.addUserToOrganization);
+  const removeUserFromOrganization = useMutation(api.admin.removeUserFromOrganization);
 
   const filteredUsers = users?.filter(user => 
     user.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -145,6 +177,49 @@ export default function AdminUsersPage() {
     return role;
   };
 
+  const handleLookupExistingUser = () => {
+    const trimmed = addExistingUsername.trim();
+    if (!trimmed) {
+      toast.error("Enter a username to look up");
+      return;
+    }
+    setLookupUsernameKey(trimmed);
+  };
+
+  const handleAddExistingToOrg = async () => {
+    if (!previewAddUser || !org) return;
+    if (previewAddUser.organizationId === org._id) {
+      toast.info("This user is already in your organization");
+      return;
+    }
+    setIsAddingToOrg(true);
+    try {
+      await addUserToOrganization({ userId: previewAddUser._id });
+      toast.success("User added to your organization");
+      setShowAddExistingDialog(false);
+      setAddExistingUsername("");
+      setLookupUsernameKey(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add user");
+    } finally {
+      setIsAddingToOrg(false);
+    }
+  };
+
+  const handleConfirmRemoveFromOrg = async () => {
+    if (!removeOrgUserId) return;
+    setIsRemovingFromOrg(true);
+    try {
+      await removeUserFromOrganization({ userId: removeOrgUserId });
+      toast.success("User removed from organization");
+      setRemoveOrgUserId(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove user");
+    } finally {
+      setIsRemovingFromOrg(false);
+    }
+  };
+
   const handleUpdateUserRole = async (userId: Id<"users">) => {
     if (!session) return;
 
@@ -189,11 +264,105 @@ export default function AdminUsersPage() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Admin
         </Button>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Users className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">User Management</h1>
           </div>
+          <div className="flex flex-wrap gap-2">
+          <Dialog
+            open={showAddExistingDialog}
+            onOpenChange={(open) => {
+              setShowAddExistingDialog(open);
+              if (!open) {
+                setAddExistingUsername("");
+                setLookupUsernameKey(null);
+              }
+            }}
+          >
+            <DialogTrigger>
+              <Button variant="outline">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Add existing user
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add user to organization</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <p className="text-sm text-muted-foreground">
+                  Look up an account by username and assign it to your organization. If the user belongs to another organization, they will be moved here.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Username"
+                    value={addExistingUsername}
+                    onChange={(e) => setAddExistingUsername(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleLookupExistingUser();
+                    }}
+                  />
+                  <Button type="button" variant="secondary" onClick={handleLookupExistingUser}>
+                    Look up
+                  </Button>
+                </div>
+                {lookupUsernameKey !== null && previewAddUser === undefined && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Looking up…
+                  </p>
+                )}
+                {lookupUsernameKey !== null && previewAddUser === null && (
+                  <p className="text-sm text-destructive">No user found with that username.</p>
+                )}
+                {previewAddUser && org === undefined && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading organization…
+                  </p>
+                )}
+                {previewAddUser && org === null && (
+                  <p className="text-sm text-destructive">
+                    No organization found for your account.
+                  </p>
+                )}
+                {previewAddUser && org && (
+                  <div className="rounded-lg border bg-muted/40 p-3 space-y-2">
+                    <p className="font-medium">{previewAddUser.displayName}</p>
+                    <p className="text-sm text-muted-foreground">@{previewAddUser.username}</p>
+                    {previewAddUser.organizationId === org._id ? (
+                      <p className="text-sm text-muted-foreground">Already in this organization.</p>
+                    ) : previewAddUser.organizationId ? (
+                      <p className="text-sm text-amber-600 dark:text-amber-500">
+                        Currently in another organization — adding will move them here.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No organization assigned — will be added to yours.</p>
+                    )}
+                    <Button
+                      type="button"
+                      className="w-full"
+                      onClick={handleAddExistingToOrg}
+                      disabled={
+                        isAddingToOrg ||
+                        previewAddUser.organizationId === org._id
+                      }
+                    >
+                      {isAddingToOrg ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Adding…
+                        </>
+                      ) : (
+                        "Add to organization"
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
             <DialogTrigger>
               <Button>
@@ -285,6 +454,7 @@ export default function AdminUsersPage() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </header>
 
@@ -388,23 +558,37 @@ export default function AdminUsersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleToggleUserStatus(user._id, !!user.isActive)}
-                    >
-                      {user.isActive ? (
-                        <>
-                          <UserX className="w-4 h-4 mr-2" />
-                          Deactivate
-                        </>
-                      ) : (
-                        <>
-                          <UserCheck className="w-4 h-4 mr-2" />
-                          Activate
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex flex-col items-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleToggleUserStatus(user._id, !!user.isActive)}
+                      >
+                        {user.isActive ? (
+                          <>
+                            <UserX className="w-4 h-4 mr-2" />
+                            Deactivate
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Activate
+                          </>
+                        )}
+                      </Button>
+                      {user.organizationId !== undefined &&
+                        session.userId !== user._id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setRemoveOrgUserId(user._id)}
+                          >
+                            <UserMinus className="w-4 h-4 mr-2" />
+                            Remove from org
+                          </Button>
+                        )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -419,6 +603,36 @@ export default function AdminUsersPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={removeOrgUserId !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoveOrgUserId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove from organization?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This clears their organization assignment. They will no longer appear in this
+              school&apos;s user list unless they are added again. Their account is not deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemovingFromOrg}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmRemoveFromOrg();
+              }}
+              disabled={isRemovingFromOrg}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRemovingFromOrg ? "Removing…" : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

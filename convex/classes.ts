@@ -1,14 +1,30 @@
-import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+  type ActionCtx,
+} from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { usernameFromIdentity } from "./authHelpers";
+
+function canBeClassTeacher(role: string | undefined): boolean {
+  return (
+    role === "teacher" ||
+    role === "co_teacher" ||
+    role === "admin"
+  );
+}
 
 export const createClass = action({
   args: {
     name: v.string(),
     subject: v.string(),
     gradeLevel: v.number(),
+    teacherId: v.id("users"),
   },
   returns: v.object({
     classId: v.id("classes"),
@@ -34,13 +50,39 @@ export const createClass = action({
       throw new Error("User not found");
     }
 
-    if (!user.role || (user.role !== "teacher" && user.role !== "admin")) {
-      throw new Error("Only teachers can create classes");
+    if (!user.role || user.role !== "admin") {
+      throw new Error("Only admins can create classes");
     }
 
     if (!user.organizationId) {
       throw new Error("User must belong to an organization");
     }
+
+    const teacher = await ctx.runQuery(internal.users.getUserById, { userId: args.teacherId });
+    if (!teacher) {
+      throw new Error("Teacher not found");
+    }
+
+    if (!canBeClassTeacher(teacher.role)) {
+      throw new Error(
+        "Class lead must be a teacher, co-teacher, or admin",
+      );
+    }
+
+    const teacherInOrg: boolean = await ctx.runQuery(
+      internal.users.userMatchesOrgForAdmin,
+      {
+        userId: args.teacherId,
+        organizationId: user.organizationId,
+      },
+    );
+    if (!teacherInOrg) {
+      throw new Error("Teacher must belong to the same organization");
+    }
+    await ctx.runMutation(internal.users.setOrganizationIfUnset, {
+      userId: args.teacherId,
+      organizationId: user.organizationId,
+    });
 
     const joinCode = Array.from({ length: 6 }, () =>
       "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random() * 36))
@@ -51,12 +93,18 @@ export const createClass = action({
     await ctx.runAction(internal.stream.createClassChannel, {
       channelId: streamChannelId,
       name: args.name,
-      teacherStreamUserId: user.streamUserId,
+      teacherStreamUserId: teacher.streamUserId,
+    });
+
+    // Ensure the assigned teacher is also a Stream member for chat visibility/removals.
+    await ctx.runAction(internal.stream.addMemberToChannel, {
+      channelId: streamChannelId,
+      streamUserId: teacher.streamUserId,
     });
 
     const classId: Id<"classes"> = await ctx.runMutation(internal.classes.insertClass, {
       organizationId: user.organizationId,
-      teacherId: user._id,
+      teacherId: args.teacherId,
       name: args.name,
       subject: args.subject,
       gradeLevel: args.gradeLevel,
@@ -69,6 +117,205 @@ export const createClass = action({
       streamChannelId,
       joinCode,
     };
+  },
+});
+
+async function requireAdminOrg(ctx: ActionCtx): Promise<{
+  adminUser: { _id: Id<"users">; organizationId: Id<"organizations"> };
+  orgId: Id<"organizations">;
+}> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Not authenticated");
+
+  const adminUser = await ctx.runQuery(internal.users.getUserByUsername, {
+    username: usernameFromIdentity(identity),
+  });
+
+  if (!adminUser || adminUser.role !== "admin") {
+    throw new Error("Only admins can perform this action");
+  }
+  if (!adminUser.organizationId) {
+    throw new Error("Admin user not found");
+  }
+
+  return { adminUser: { _id: adminUser._id, organizationId: adminUser.organizationId }, orgId: adminUser.organizationId };
+}
+
+export const getClassByIdInternal = internalQuery({
+  args: { classId: v.id("classes") },
+  returns: v.union(
+    v.object({
+      _id: v.id("classes"),
+      organizationId: v.id("organizations"),
+      teacherId: v.id("users"),
+      streamChannelId: v.string(),
+      name: v.string(),
+      isArchived: v.boolean(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const cls = await ctx.db.get(args.classId);
+    if (!cls) return null;
+    return {
+      _id: cls._id,
+      organizationId: cls.organizationId,
+      teacherId: cls.teacherId,
+      streamChannelId: cls.streamChannelId,
+      name: cls.name,
+      isArchived: cls.isArchived,
+    };
+  },
+});
+
+export const setTeacherForClass = internalMutation({
+  args: {
+    classId: v.id("classes"),
+    teacherId: v.id("users"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.classId, { teacherId: args.teacherId });
+    return null;
+  },
+});
+
+export const adminAddStudentToClass = action({
+  args: { classId: v.id("classes"), studentId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { adminUser, orgId } = await requireAdminOrg(ctx);
+
+    const cls = await ctx.runQuery(internal.classes.getClassByIdInternal, {
+      classId: args.classId,
+    });
+    if (!cls) throw new Error("Class not found");
+    if (cls.isArchived) throw new Error("This class is archived");
+    if (cls.organizationId !== orgId) {
+      throw new Error("Class not in admin organization");
+    }
+
+    const student = await ctx.runQuery(internal.users.getUserById, {
+      userId: args.studentId,
+    });
+    if (!student) throw new Error("Student not found");
+    if (!student.role || student.role !== "student") {
+      throw new Error("Only student users can be added to classes");
+    }
+    const studentInOrg: boolean = await ctx.runQuery(
+      internal.users.userMatchesOrgForAdmin,
+      { userId: args.studentId, organizationId: orgId },
+    );
+    if (!studentInOrg) {
+      throw new Error("Student not in admin organization");
+    }
+    await ctx.runMutation(internal.users.setOrganizationIfUnset, {
+      userId: args.studentId,
+      organizationId: orgId,
+    });
+
+    await ctx.runMutation(internal.classes.upsertEnrollment, {
+      classId: args.classId,
+      studentId: args.studentId,
+    });
+
+    // Add to Stream chat so they can read/post in the classroom channel.
+    await ctx.runAction(internal.stream.addMemberToChannel, {
+      channelId: cls.streamChannelId,
+      streamUserId: student.streamUserId,
+    });
+
+    await ctx.runMutation(internal.auditLog.logAction, {
+      organizationId: orgId,
+      actorId: adminUser._id,
+      action: "student_added_to_class",
+      targetId: args.studentId,
+      targetType: "user",
+      metadata: JSON.stringify({
+        classId: args.classId,
+        className: cls.name,
+      }),
+    });
+
+    return null;
+  },
+});
+
+export const adminAssignTeacherToClass = action({
+  args: { classId: v.id("classes"), teacherId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { adminUser, orgId } = await requireAdminOrg(ctx);
+
+    const cls = await ctx.runQuery(internal.classes.getClassByIdInternal, {
+      classId: args.classId,
+    });
+    if (!cls) throw new Error("Class not found");
+    if (cls.isArchived) throw new Error("This class is archived");
+    if (cls.organizationId !== orgId) {
+      throw new Error("Class not in admin organization");
+    }
+
+    const previousTeacher = await ctx.runQuery(internal.users.getUserById, {
+      userId: cls.teacherId,
+    });
+    if (!previousTeacher) throw new Error("Previous teacher not found");
+
+    const nextTeacher = await ctx.runQuery(internal.users.getUserById, {
+      userId: args.teacherId,
+    });
+    if (!nextTeacher) throw new Error("Teacher not found");
+    if (!canBeClassTeacher(nextTeacher.role)) {
+      throw new Error(
+        "Class lead must be a teacher, co-teacher, or admin",
+      );
+    }
+    const nextTeacherInOrg: boolean = await ctx.runQuery(
+      internal.users.userMatchesOrgForAdmin,
+      { userId: args.teacherId, organizationId: orgId },
+    );
+    if (!nextTeacherInOrg) {
+      throw new Error("Teacher must belong to the same organization");
+    }
+    await ctx.runMutation(internal.users.setOrganizationIfUnset, {
+      userId: args.teacherId,
+      organizationId: orgId,
+    });
+
+    if (nextTeacher._id === cls.teacherId) {
+      return null;
+    }
+
+    // Update Stream membership first, so the chat channel reflects the new teacher.
+    await ctx.runAction(internal.stream.addMemberToChannel, {
+      channelId: cls.streamChannelId,
+      streamUserId: nextTeacher.streamUserId,
+    });
+    await ctx.runAction(internal.stream.removeMemberFromChannel, {
+      channelId: cls.streamChannelId,
+      streamUserId: previousTeacher.streamUserId,
+    });
+
+    await ctx.runMutation(internal.classes.setTeacherForClass, {
+      classId: args.classId,
+      teacherId: args.teacherId,
+    });
+
+    await ctx.runMutation(internal.auditLog.logAction, {
+      organizationId: orgId,
+      actorId: adminUser._id,
+      action: "teacher_assigned_to_class",
+      targetId: args.teacherId,
+      targetType: "user",
+      metadata: JSON.stringify({
+        classId: args.classId,
+        className: cls.name,
+        fromTeacherId: cls.teacherId,
+        toTeacherId: args.teacherId,
+      }),
+    });
+
+    return null;
   },
 });
 
@@ -135,10 +382,11 @@ export const getClassesByTeacher = query({
     const classes = await ctx.db
       .query("classes")
       .withIndex("by_teacher", (q) => q.eq("teacherId", user._id))
-      .filter((q) => q.eq(q.field("isArchived"), false))
       .collect();
 
-    return classes.map((cls) => ({
+    const active = classes.filter((c) => !c.isArchived);
+
+    return active.map((cls) => ({
       ...cls,
       teacherDisplayName: user.displayName,
       teacherAvatarUrl: user.avatarUrl,
@@ -226,6 +474,7 @@ export const getClassById = query({
       joinCode: v.string(),
       isArchived: v.boolean(),
       createdAt: v.number(),
+      enrollmentCount: v.number(),
     }),
     v.null()
   ),
@@ -257,19 +506,147 @@ export const getClassById = query({
       )
       .unique();
 
-    if (!isTeacher && !isEnrolled) {
+    const isAdmin = user.role === "admin";
+    if (!isTeacher && !isEnrolled && !isAdmin) {
       throw new Error("Not authorized to view this class");
     }
+
+    const enrollments = await ctx.db
+      .query("enrollments")
+      .withIndex("by_class", (q) => q.eq("classId", args.classId))
+      .collect();
+    const enrollmentCount = enrollments.filter((e) => e.status === "active").length;
 
     const teacher = await ctx.db.get(cls.teacherId);
     return {
       ...cls,
+      enrollmentCount,
       teacher: teacher
         ? {
             displayName: teacher.displayName,
             avatarUrl: teacher.avatarUrl,
           }
         : undefined,
+    };
+  },
+});
+
+/** Roster + metadata for the class detail page (class teacher or org admin only). */
+export const getClassManagementDetail = query({
+  args: { classId: v.id("classes") },
+  returns: v.union(
+    v.object({
+      _id: v.id("classes"),
+      _creationTime: v.number(),
+      organizationId: v.id("organizations"),
+      teacherId: v.id("users"),
+      name: v.string(),
+      subject: v.string(),
+      gradeLevel: v.number(),
+      streamChannelId: v.string(),
+      joinCode: v.string(),
+      isArchived: v.boolean(),
+      createdAt: v.number(),
+      enrollmentCount: v.number(),
+      teacher: v.object({
+        _id: v.id("users"),
+        displayName: v.string(),
+        username: v.string(),
+        avatarUrl: v.optional(v.string()),
+      }),
+      students: v.array(
+        v.object({
+          studentId: v.id("users"),
+          displayName: v.string(),
+          username: v.string(),
+          enrolledAt: v.number(),
+        }),
+      ),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const cls = await ctx.db.get(args.classId);
+    if (!cls) {
+      return null;
+    }
+
+    const isTeacher = cls.teacherId === user._id;
+    const isOrgAdmin =
+      user.role === "admin" &&
+      !!user.organizationId &&
+      user.organizationId === cls.organizationId;
+
+    if (!isTeacher && !isOrgAdmin) {
+      throw new Error("Not authorized to view class details");
+    }
+
+    const enrollments = await ctx.db
+      .query("enrollments")
+      .withIndex("by_class", (q) => q.eq("classId", args.classId))
+      .collect();
+
+    const active = enrollments.filter((e) => e.status === "active");
+
+    const students: Array<{
+      studentId: Id<"users">;
+      displayName: string;
+      username: string;
+      enrolledAt: number;
+    }> = [];
+
+    for (const e of active) {
+      const s = await ctx.db.get(e.studentId);
+      if (s) {
+        students.push({
+          studentId: s._id,
+          displayName: s.displayName,
+          username: s.username,
+          enrolledAt: e.enrolledAt,
+        });
+      }
+    }
+    students.sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+    const teacher = await ctx.db.get(cls.teacherId);
+    if (!teacher) {
+      throw new Error("Teacher not found");
+    }
+
+    return {
+      _id: cls._id,
+      _creationTime: cls._creationTime,
+      organizationId: cls.organizationId,
+      teacherId: cls.teacherId,
+      name: cls.name,
+      subject: cls.subject,
+      gradeLevel: cls.gradeLevel,
+      streamChannelId: cls.streamChannelId,
+      joinCode: cls.joinCode,
+      isArchived: cls.isArchived,
+      createdAt: cls.createdAt,
+      enrollmentCount: active.length,
+      teacher: {
+        _id: teacher._id,
+        displayName: teacher.displayName,
+        username: teacher.username,
+        avatarUrl: teacher.avatarUrl,
+      },
+      students,
     };
   },
 });

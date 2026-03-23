@@ -83,19 +83,29 @@ export function ClassSidebar() {
   const { gradeBand } = useGradeSkin();
   const pathname = usePathname();
   
-  // Fetch classes based on user role
+  // Teachers/co-teachers: classes they lead. Admins: all org classes (not only where they are teacherId).
   const teacherClasses = useQuery(
     api.classes.getClassesByTeacher,
-    session?.role === "teacher" || session?.role === "admin" ? {} : "skip"
+    session?.role === "teacher" || session?.role === "co_teacher" ? {} : "skip",
   );
-  
+
+  const adminOrgClasses = useQuery(
+    api.admin.getAllClasses,
+    session?.role === "admin" ? {} : "skip",
+  );
+
   const studentClasses = useQuery(
     api.classes.getClassesByStudent,
-    session?.role === "student" ? {} : "skip"
+    session?.role === "student" ? {} : "skip",
   );
 
   const classes = useMemo(() => {
-    const rawClasses = teacherClasses || studentClasses || [];
+    const rawClasses =
+      session?.role === "admin"
+        ? (adminOrgClasses ?? []).filter((c) => !c.isArchived)
+        : session?.role === "student"
+          ? studentClasses ?? []
+          : teacherClasses ?? [];
     // Group by subject
     const grouped = rawClasses.reduce((acc, cls) => {
       const subject = cls.subject.toLowerCase();
@@ -107,16 +117,20 @@ export function ClassSidebar() {
     }, {} as Record<string, Class[]>);
     
     return grouped;
-  }, [teacherClasses, studentClasses]);
+  }, [session?.role, adminOrgClasses, teacherClasses, studentClasses]);
 
-  const isTeacher = session?.role === "teacher" || session?.role === "admin";
+  const isTeacherLike =
+    session?.role === "teacher" ||
+    session?.role === "co_teacher" ||
+    session?.role === "admin";
+  const canCreate = session?.role === "admin";
 
   // Primary band: icon + color dot only
   if (gradeBand === "primary") {
     return (
       <aside className="w-20 border-r border-border bg-card flex flex-col">
         <div className="p-3 border-b border-border">
-          {isTeacher && (
+          {canCreate && (
             <Link href="/class/create">
               <Button size="icon" className="w-12 h-12 rounded-xl">
                 <Plus className="w-6 h-6" />
@@ -169,7 +183,7 @@ export function ClassSidebar() {
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between">
         <h2 className="font-semibold text-lg">Classes</h2>
-        {isTeacher && (
+        {canCreate && (
           <Link href="/class/create">
             <Button size="sm" variant="ghost">
               <Plus className="w-4 h-4 mr-1" />
@@ -185,7 +199,7 @@ export function ClassSidebar() {
             <div className="text-center py-8 text-muted-foreground">
               <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No classes yet</p>
-              {isTeacher && (
+              {canCreate && (
                 <p className="text-xs mt-1">Create your first class</p>
               )}
             </div>
@@ -251,7 +265,7 @@ export function ClassSidebar() {
       </ScrollArea>
       
       {/* Join code input for students */}
-      {!isTeacher && (
+      {!isTeacherLike && (
         <div className="p-3 border-t border-border">
           <Link href="/dashboard?join=true">
             <Button variant="outline" className="w-full" size="sm">

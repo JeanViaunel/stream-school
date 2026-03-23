@@ -187,17 +187,24 @@ export function Sidebar() {
   const sortedDMs = useMemo(() => sortChannels(directMessages), [directMessages, pinnedChannelIds]);
   const sortedGroups = useMemo(() => sortChannels(groupChats), [groupChats, pinnedChannelIds]);
 
-  // Fetch classes
+  // Fetch classes (admins see all org classes, not only classes where they are teacherId)
   const teacherClasses = useQuery(
     api.classes.getClassesByTeacher,
-    session?.role === "teacher" || session?.role === "admin" ? {} : "skip"
+    session?.role === "teacher" || session?.role === "co_teacher" ? {} : "skip",
+  );
+  const adminOrgClasses = useQuery(
+    api.admin.getAllClasses,
+    session?.role === "admin" ? {} : "skip",
   );
   const studentClasses = useQuery(
     api.classes.getClassesByStudent,
     session?.role === "student" ? {} : "skip"
   );
-  const classes = teacherClasses || studentClasses || [];
-  const isTeacher = session?.role === "teacher" || session?.role === "admin";
+  const classes =
+    session?.role === "admin"
+      ? (adminOrgClasses ?? []).filter((c) => !c.isArchived)
+      : teacherClasses || studentClasses || [];
+  const isAdmin = session?.role === "admin";
 
   // Handlers
   async function handleLogout() {
@@ -340,8 +347,8 @@ export function Sidebar() {
               {/* Classes List */}
               {expandedSections.classes && (
                 <div className="ml-4 space-y-1">
-                  {/* Create Class Button (Teachers) */}
-                  {isTeacher && (
+                  {/* Create Class Button (Admins only) */}
+                  {isAdmin && (
                     <Link href="/class/create">
                       <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors cursor-pointer">
                         <Plus className="h-4 w-4" />

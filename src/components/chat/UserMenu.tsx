@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Popover,
   PopoverContent,
@@ -61,6 +61,19 @@ export function UserMenu({ onLogout }: UserMenuProps) {
   const { session } = useAuth();
   const { client } = useChatContext();
   const router = useRouter();
+  const pathname = usePathname();
+
+  const goToMyClasses = () => {
+    setOpen(false);
+    if (pathname === "/dashboard") {
+      document
+        .getElementById("my-classes")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.history.replaceState(null, "", `${pathname}#my-classes`);
+      return;
+    }
+    router.push("/dashboard#my-classes");
+  };
   const [status, setStatus] = useState<UserStatus>("online");
   const [syncingStatus, setSyncingStatus] = useState(false);
   const [open, setOpen] = useState(false);
@@ -215,10 +228,13 @@ export function UserMenu({ onLogout }: UserMenuProps) {
             </button>
           )}
           
-          {/* Classes - for teachers and students */}
-          {(session?.role === "teacher" || session?.role === "student") && (
+          {/* Classes — scroll to roster on dashboard (same URL as Dashboard was a no-op) */}
+          {(session?.role === "teacher" ||
+            session?.role === "co_teacher" ||
+            session?.role === "student") && (
             <button
-              onClick={() => { setOpen(false); router.push("/dashboard"); }}
+              type="button"
+              onClick={goToMyClasses}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-muted transition-colors"
             >
               <GraduationCap className="h-4 w-4 text-muted-foreground" />

@@ -1,8 +1,42 @@
-import { action, mutation, query } from "./_generated/server";
+import { action, mutation, query, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { usernameFromIdentity } from "./authHelpers";
+
+/** Users with no `organizationId` are omitted from `by_organization`; merge them for the canonical default org or single-tenant deployments. */
+async function collectUsersForOrg(
+  ctx: QueryCtx,
+  orgId: Id<"organizations">,
+): Promise<Array<Doc<"users">>> {
+  const inOrg = await ctx.db
+    .query("users")
+    .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+    .collect();
+
+  const byId = new Map(inOrg.map((u) => [u._id, u]));
+
+  const allOrgs = await ctx.db.query("organizations").collect();
+  const defaultOrg = await ctx.db
+    .query("organizations")
+    .withIndex("by_slug", (q) => q.eq("slug", "default"))
+    .unique();
+
+  const includeUsersWithoutOrg =
+    (allOrgs.length === 1 && allOrgs[0]._id === orgId) ||
+    (defaultOrg !== null && orgId === defaultOrg._id);
+
+  if (includeUsersWithoutOrg) {
+    const allUsers = await ctx.db.query("users").collect();
+    for (const u of allUsers) {
+      if (u.organizationId === undefined && !byId.has(u._id)) {
+        byId.set(u._id, u);
+      }
+    }
+  }
+
+  return Array.from(byId.values());
+}
 
 async function requireAdmin(
   ctx: any,
@@ -171,13 +205,18 @@ export const getAllUsers = query({
       gradeLevel: v.optional(v.number()),
       isActive: v.optional(v.boolean()),
       createdAt: v.number(),
+      organizationId: v.optional(v.id("organizations")),
     })
   ),
   handler: async (ctx) => {
-    // Admins can view ALL users (across organizations).
-    await requireAdmin(ctx, "Only admins can view all users");
+    const { orgId } = await requireAdmin(
+      ctx,
+      "Only admins can view all users"
+    );
 
-    const users = await ctx.db.query("users").collect();
+    const users = (await collectUsersForOrg(ctx, orgId)).sort(
+      (a, b) => b.createdAt - a.createdAt,
+    );
 
     return users.map((u) => ({
       _id: u._id,
@@ -188,7 +227,136 @@ export const getAllUsers = query({
       gradeLevel: u.gradeLevel,
       isActive: u.isActive,
       createdAt: u.createdAt,
+      organizationId: u.organizationId,
     }));
+  },
+});
+
+const previewUserForOrgValidator = v.object({
+  _id: v.id("users"),
+  username: v.string(),
+  displayName: v.string(),
+  organizationId: v.optional(v.id("organizations")),
+});
+
+/** Look up any user by username so an admin can attach them to the organization. */
+export const previewUserForAddToOrganization = query({
+  args: { username: v.string() },
+  returns: v.union(previewUserForOrgValidator, v.null()),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, "Only admins can look up users");
+
+    const trimmed = args.username.trim();
+    if (!trimmed) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", trimmed))
+      .unique();
+
+    if (!user) return null;
+
+    return {
+      _id: user._id,
+      username: user.username,
+      displayName: user.displayName,
+      organizationId: user.organizationId,
+    };
+  },
+});
+
+/** Assign a user to the admin's organization (idempotent; transfers from another org if needed). */
+export const addUserToOrganization = mutation({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { adminUser, orgId } = await requireAdmin(
+      ctx,
+      "Only admins can add users to the organization",
+    );
+
+    if (args.userId === adminUser._id) {
+      throw new Error("You cannot change your own organization here");
+    }
+
+    const target = await ctx.db.get(args.userId);
+    if (!target) throw new Error("User not found");
+
+    if (target.organizationId === orgId) {
+      return null;
+    }
+
+    const previousOrganizationId = target.organizationId ?? null;
+
+    await ctx.db.patch(args.userId, { organizationId: orgId });
+
+    await ctx.runMutation(internal.auditLog.logAction, {
+      organizationId: orgId,
+      actorId: adminUser._id,
+      action: "user_added_to_organization",
+      targetId: args.userId,
+      targetType: "user",
+      metadata: JSON.stringify({
+        previousOrganizationId,
+      }),
+    });
+
+    return null;
+  },
+});
+
+/** Clear organization membership for a user who is explicitly assigned to this org. */
+export const removeUserFromOrganization = mutation({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { adminUser, orgId } = await requireAdmin(
+      ctx,
+      "Only admins can remove users from the organization",
+    );
+
+    if (args.userId === adminUser._id) {
+      throw new Error("You cannot remove yourself from the organization");
+    }
+
+    const target = await ctx.db.get(args.userId);
+    if (!target) throw new Error("User not found");
+
+    if (target.organizationId !== orgId) {
+      throw new Error(
+        "User is not assigned to your organization (legacy accounts without an org cannot be removed this way)",
+      );
+    }
+
+    if (target.role === "admin") {
+      const adminsInOrg = await ctx.db
+        .query("users")
+        .withIndex("by_role_and_organization", (q) =>
+          q.eq("role", "admin").eq("organizationId", orgId),
+        )
+        .collect();
+      if (
+        adminsInOrg.length === 1 &&
+        adminsInOrg[0]._id === target._id
+      ) {
+        throw new Error(
+          "Cannot remove the only administrator assigned to this organization",
+        );
+      }
+    }
+
+    await ctx.db.patch(args.userId, { organizationId: undefined });
+
+    await ctx.runMutation(internal.auditLog.logAction, {
+      organizationId: orgId,
+      actorId: adminUser._id,
+      action: "user_removed_from_organization",
+      targetId: args.userId,
+      targetType: "user",
+      metadata: JSON.stringify({}),
+    });
+
+    return null;
   },
 });
 
@@ -209,10 +377,7 @@ export const getDashboardStats = query({
       "Only admins can view dashboard stats",
     );
 
-    const users = await ctx.db
-      .query("users")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .collect();
+    const users = await collectUsersForOrg(ctx, orgId);
 
     const classes = await ctx.db
       .query("classes")
@@ -337,6 +502,140 @@ export const reactivateUser = mutation({
       targetId: args.userId,
       targetType: "user",
     });
+    return null;
+  },
+});
+
+const organizationDocValidator = v.object({
+  _id: v.id("organizations"),
+  _creationTime: v.number(),
+  name: v.string(),
+  slug: v.string(),
+  logoUrl: v.optional(v.string()),
+  primaryColor: v.optional(v.string()),
+  createdAt: v.number(),
+  settings: v.object({
+    studentDmsEnabled: v.boolean(),
+    recordingEnabled: v.boolean(),
+    lobbyEnabled: v.boolean(),
+    maxClassSize: v.number(),
+    dataRetentionDays: v.number(),
+  }),
+});
+
+export const getMyOrganization = query({
+  args: {},
+  returns: v.union(organizationDocValidator, v.null()),
+  handler: async (ctx) => {
+    const { orgId } = await requireAdmin(
+      ctx,
+      "Only admins can view organization settings",
+    );
+    const org = await ctx.db.get(orgId);
+    return org ?? null;
+  },
+});
+
+export const updateMyOrganization = mutation({
+  args: {
+    name: v.optional(v.string()),
+    slug: v.optional(v.string()),
+    logoUrl: v.optional(v.union(v.string(), v.null())),
+    primaryColor: v.optional(v.union(v.string(), v.null())),
+    settings: v.optional(
+      v.object({
+        studentDmsEnabled: v.optional(v.boolean()),
+        recordingEnabled: v.optional(v.boolean()),
+        lobbyEnabled: v.optional(v.boolean()),
+        maxClassSize: v.optional(v.number()),
+        dataRetentionDays: v.optional(v.number()),
+      }),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { adminUser, orgId } = await requireAdmin(
+      ctx,
+      "Only admins can update organization settings",
+    );
+
+    const org = await ctx.db.get(orgId);
+    if (!org) throw new Error("Organization not found");
+
+    if (args.slug !== undefined) {
+      const slug = args.slug.trim().toLowerCase();
+      if (slug.length < 2) {
+        throw new Error("Slug must be at least 2 characters");
+      }
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+        throw new Error(
+          "Slug may only contain lowercase letters, numbers, and hyphens",
+        );
+      }
+      if (slug !== org.slug) {
+        const taken = await ctx.db
+          .query("organizations")
+          .withIndex("by_slug", (q) => q.eq("slug", slug))
+          .unique();
+        if (taken !== null) {
+          throw new Error("This slug is already in use");
+        }
+      }
+    }
+
+    if (args.name !== undefined && !args.name.trim()) {
+      throw new Error("Name cannot be empty");
+    }
+
+    const nextSettings =
+      args.settings !== undefined
+        ? {
+            studentDmsEnabled:
+              args.settings.studentDmsEnabled ?? org.settings.studentDmsEnabled,
+            recordingEnabled:
+              args.settings.recordingEnabled ?? org.settings.recordingEnabled,
+            lobbyEnabled: args.settings.lobbyEnabled ?? org.settings.lobbyEnabled,
+            maxClassSize: args.settings.maxClassSize ?? org.settings.maxClassSize,
+            dataRetentionDays:
+              args.settings.dataRetentionDays ?? org.settings.dataRetentionDays,
+          }
+        : org.settings;
+
+    if (nextSettings.maxClassSize < 1 || nextSettings.maxClassSize > 500) {
+      throw new Error("Max class size must be between 1 and 500");
+    }
+    if (nextSettings.dataRetentionDays < 1) {
+      throw new Error("Data retention must be at least 1 day");
+    }
+
+    const patch: Record<string, unknown> = {};
+    if (args.name !== undefined) patch.name = args.name.trim();
+    if (args.slug !== undefined) patch.slug = args.slug.trim().toLowerCase();
+    if (args.logoUrl !== undefined) {
+      patch.logoUrl =
+        args.logoUrl === null || args.logoUrl === "" ? undefined : args.logoUrl;
+    }
+    if (args.primaryColor !== undefined) {
+      patch.primaryColor =
+        args.primaryColor === null || args.primaryColor === ""
+          ? undefined
+          : args.primaryColor;
+    }
+    if (args.settings !== undefined) patch.settings = nextSettings;
+
+    await ctx.db.patch(orgId, patch as Partial<Doc<"organizations">>);
+
+    await ctx.runMutation(internal.auditLog.logAction, {
+      organizationId: orgId,
+      actorId: adminUser._id,
+      action: "organization_updated",
+      targetId: orgId,
+      targetType: "organization",
+      metadata: JSON.stringify({
+        fields: Object.keys(patch),
+      }),
+    });
+
     return null;
   },
 });
