@@ -357,3 +357,65 @@ export const getTeacherStats = query({
     };
   },
 });
+
+// COPPA Compliance - Get user by consent token
+export const getUserByConsentToken = internalQuery({
+  args: { consentToken: v.string() },
+  returns: v.union(
+    v.object({
+      _id: v.id("users"),
+      _creationTime: v.number(),
+      username: v.string(),
+      displayName: v.string(),
+      streamUserId: v.string(),
+      createdAt: v.number(),
+      role: v.optional(v.union(
+        v.literal("student"),
+        v.literal("teacher"),
+        v.literal("co_teacher"),
+        v.literal("parent"),
+        v.literal("admin")
+      )),
+      organizationId: v.optional(v.id("organizations")),
+      gradeLevel: v.optional(v.number()),
+      parentalConsentStatus: v.optional(v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("not_required")
+      )),
+      parentEmail: v.optional(v.string()),
+      isActive: v.optional(v.boolean()),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, { consentToken }) => {
+    return await ctx.db
+      .query("users")
+      .withIndex("by_consent_token", (q) => q.eq("consentToken", consentToken))
+      .unique();
+  },
+});
+
+// COPPA Compliance - Update parental consent status
+export const updateParentalConsent = internalMutation({
+  args: {
+    userId: v.id("users"),
+    parentalConsentStatus: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("not_required")
+    ),
+    consentVerifiedAt: v.optional(v.number()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.userId, {
+      parentalConsentStatus: args.parentalConsentStatus,
+      consentVerifiedAt: args.consentVerifiedAt,
+      isActive: args.parentalConsentStatus === "approved" || args.parentalConsentStatus === "not_required",
+      parentConsentGiven: args.parentalConsentStatus === "approved",
+      parentConsentAt: args.parentalConsentStatus === "approved" ? args.consentVerifiedAt : undefined,
+    });
+    return null;
+  },
+});

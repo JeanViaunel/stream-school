@@ -443,6 +443,23 @@ export const markSessionEnded = internalMutation({
   },
 });
 
+export const addSummary = internalMutation({
+  args: {
+    sessionId: v.id("sessions"),
+    summary: v.string(),
+    keyPoints: v.array(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.sessionId, {
+      summary: args.summary,
+      summaryKeyPoints: args.keyPoints,
+      summaryGeneratedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
 export const getActiveSessionForClass = query({
   args: { classId: v.id("classes") },
   returns: v.union(

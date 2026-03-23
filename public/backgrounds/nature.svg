@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2F855A"/>
+      <stop offset="50%" style="stop-color:#38A169"/>
+      <stop offset="100%" style="stop-color:#48BB78"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <circle cx="200" cy="200" r="100" fill="#276749" opacity="0.5"/>
+  <circle cx="1700" cy="300" r="150" fill="#2F855A" opacity="0.5"/>
+  <circle cx="400" cy="800" r="120" fill="#22543D" opacity="0.4"/>
+  <circle cx="1600" cy="900" r="80" fill="#276749" opacity="0.4"/>
+  <circle cx="960" cy="200" r="200" fill="#F6E05E" opacity="0.2"/>
+  <text x="960" y="540" font-family="system-ui" font-size="120" fill="rgba(255,255,255,0.3)" text-anchor="middle">🌳</text>
+</svg>

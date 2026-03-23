@@ -11,4 +11,21 @@ crons.cron(
   {}
 );
 
+// FERPA Compliance - Data retention cleanup
+// Runs weekly at 2:00 AM on Sunday
+crons.cron(
+  "data retention cleanup",
+  "0 2 * * 0", // cron format: min hour day month dayOfWeek (Sunday=0)
+  internal.privacy.dataRetentionCleanup,
+  {}
+);
+
+// Cleanup expired data exports (daily at 3:00 AM)
+crons.cron(
+  "cleanup expired exports",
+  "0 3 * * *", // daily at 3:00 AM
+  internal.exports.cleanupExpiredExports,
+  {}
+);
+
 export default crons;

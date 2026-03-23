@@ -48,6 +48,30 @@ export const logAction = internalMutation({
   },
 });
 
+// Alias for createAuditLog to support COPPA/FERPA compliance logging
+export const createAuditLog = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    actorId: v.id("users"),
+    action: v.string(),
+    targetId: v.optional(v.string()),
+    targetType: v.optional(v.string()),
+    metadata: v.optional(v.string()),
+  },
+  returns: v.id("auditLogs"),
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("auditLogs", {
+      organizationId: args.organizationId,
+      actorId: args.actorId,
+      action: args.action,
+      targetId: args.targetId,
+      targetType: args.targetType,
+      metadata: args.metadata,
+      createdAt: Date.now(),
+    });
+  },
+});
+
 const auditRow = v.object({
   _id: v.id("auditLogs"),
   _creationTime: v.number(),

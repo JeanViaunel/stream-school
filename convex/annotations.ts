@@ -40,7 +40,7 @@ export const addAnnotation = mutation({
     }
     
     const annotation = {
-      id: crypto.randomUUID(),
+      id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       userId: user._id,
       type: args.annotation.type,
       data: args.annotation.data,

@@ -24,7 +24,7 @@ interface Reaction {
   userId: string;
   userName: string;
   timestamp: number;
-  x: number; // Random horizontal position
+  x: number;
 }
 
 interface FloatingReactionProps {
@@ -69,41 +69,43 @@ export function LiveReactions() {
     reactionsRef.current = reactions;
   }, [reactions]);
 
-  // Listen for reactions from other participants
+  // Listen for custom events (reactions) from other participants
   useEffect(() => {
     if (!call) return;
 
-    const handleReaction = (event: {
+    const handleCustomEvent = (event: {
       type: string;
-      reaction?: {
-        type: string;
+      custom?: {
+        type?: string;
         emoji?: string;
-        user?: { id?: string; name?: string };
+        userId?: string;
+        userName?: string;
       };
+      user?: { id?: string; name?: string };
     }) => {
-      if (event.type === "reaction.new" && event.reaction) {
-        const { emoji, user } = event.reaction;
-        if (!emoji || !user?.id) return;
+      if (event.type === "custom" && event.custom?.type === "reaction") {
+        const { emoji, userId, userName } = event.custom;
+        if (!emoji) return;
 
-        // Skip if it's our own reaction (we show it immediately when sending)
-        if (user.id === localParticipant?.userId) return;
+        // Skip if it's our own reaction
+        if (userId === localParticipant?.userId) return;
 
         const newReaction: Reaction = {
           id: `${Date.now()}-${Math.random()}`,
           emoji,
-          userId: user.id,
-          userName: user.name || "Someone",
+          userId: userId || event.user?.id || "unknown",
+          userName: userName || event.user?.name || "Someone",
           timestamp: Date.now(),
-          x: 10 + Math.random() * 80, // Random position between 10% and 90%
+          x: 10 + Math.random() * 80,
         };
 
         setReactions((prev) => [...prev, newReaction]);
       }
     };
 
-    call.on("reaction.new", handleReaction);
+    call.on("custom", handleCustomEvent);
     return () => {
-      call.off("reaction.new", handleReaction);
+      call.off("custom", handleCustomEvent);
     };
   }, [call, localParticipant?.userId]);
 
@@ -112,10 +114,12 @@ export function LiveReactions() {
       if (!call) return;
 
       try {
-        // Send reaction through Stream SDK
-        await call.sendReaction({
+        // Send reaction as a custom event through Stream SDK
+        await call.sendCustomEvent({
           type: "reaction",
           emoji,
+          userId: localParticipant?.userId,
+          userName: localParticipant?.name || "You",
         });
 
         // Show our own reaction immediately
@@ -134,12 +138,26 @@ export function LiveReactions() {
         console.error("Failed to send reaction:", error);
       }
     },
-    [call, localParticipant?.userId]
+    [call, localParticipant?.userId, localParticipant?.name]
   );
 
   const removeReaction = useCallback((id: string) => {
     setReactions((prev) => prev.filter((r) => r.id !== id));
   }, []);
+
+  const triggerButton = (
+    <button
+      className={cn(
+        "group relative flex h-14 w-14 items-center justify-center rounded-2xl",
+        "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+        isOpen
+          ? "bg-yellow-500/30 text-yellow-400 border border-yellow-500/40"
+          : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5 hover:border-white/15"
+      )}
+    >
+      <SmilePlus className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+    </button>
+  );
 
   return (
     <>
@@ -154,49 +172,36 @@ export function LiveReactions() {
 
       {/* Reaction picker */}
       <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Popover open={isOpen} onOpenChange={setIsOpen}>
-              <PopoverTrigger asChild>
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+          <Tooltip>
+            <TooltipTrigger render={triggerButton} />
+            <TooltipContent side="top">
+              <p>Send Reaction</p>
+            </TooltipContent>
+          </Tooltip>
+          <PopoverTrigger>{triggerButton}</PopoverTrigger>
+          <PopoverContent
+            align="center"
+            side="top"
+            className="w-auto p-3 glass-strong border-white/10"
+          >
+            <div className="flex items-center gap-1">
+              {QUICK_REACTIONS.map((emoji) => (
                 <button
+                  key={emoji}
+                  onClick={() => sendReaction(emoji)}
                   className={cn(
-                    "group relative flex h-14 w-14 items-center justify-center rounded-2xl",
-                    "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
-                    isOpen
-                      ? "bg-yellow-500/30 text-yellow-400 border border-yellow-500/40"
-                      : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5 hover:border-white/15"
+                    "flex h-10 w-10 items-center justify-center rounded-xl",
+                    "text-xl transition-all duration-150 hover:scale-110",
+                    "hover:bg-white/10"
                   )}
                 >
-                  <SmilePlus className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+                  {emoji}
                 </button>
-              </PopoverTrigger>
-              <PopoverContent
-                align="center"
-                side="top"
-                className="w-auto p-3 glass-strong border-white/10"
-              >
-                <div className="flex items-center gap-1">
-                  {QUICK_REACTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => sendReaction(emoji)}
-                      className={cn(
-                        "flex h-10 w-10 items-center justify-center rounded-xl",
-                        "text-xl transition-all duration-150 hover:scale-110",
-                        "hover:bg-white/10"
-                      )}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-          </TooltipTrigger>
-          <TooltipContent side="top">
-            <p>Send Reaction</p>
-          </TooltipContent>
-        </Tooltip>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </TooltipProvider>
     </>
   );

@@ -28,6 +28,7 @@ import { Loader2, MicOff } from "lucide-react";
 import { TranscriptionToggle } from "./TranscriptionToggle";
 import { ClosedCaptions } from "./ClosedCaptions";
 import { ToggleClosedCaptions } from "./ToggleClosedCaptions";
+import { ScreenShareAnnotation } from "./ScreenShareAnnotation";
 
 interface PendingUser {
   id: string;
@@ -45,6 +46,7 @@ interface ClassCallRoomInnerProps {
   onMuteAll: () => Promise<void>;
   onLeave: () => void;
   onEndForAll?: () => Promise<void>;
+  activeSessionId?: Id<"sessions">;
 }
 
 function ClassCallRoomInner({
@@ -57,12 +59,14 @@ function ClassCallRoomInner({
   onMuteAll,
   onLeave,
   onEndForAll,
-}: ClassCallRoomInnerProps) {
-  const { useCallCallingState, useParticipants, useCameraState, useMicrophoneState } = useCallStateHooks();
+  activeSessionId,
+}: ClassCallRoomInnerProps & { activeSessionId?: Id<"sessions"> }) {
+  const { useCallCallingState, useParticipants, useCameraState, useMicrophoneState, useScreenShareState } = useCallStateHooks();
   const callingState = useCallCallingState();
   const participants = useParticipants();
   const { camera } = useCameraState();
   const { microphone } = useMicrophoneState();
+  const { isMute: isScreenShareMuted } = useScreenShareState();
   const call = useCall();
   const { gradeBand } = useGradeSkin();
   const isPrimaryBand = gradeBand === "primary";
@@ -73,6 +77,10 @@ function ClassCallRoomInner({
   const [wasTerminated, setWasTerminated] = useState(false);
   const endHandledRef = useRef(false);
   const lastParticipantCountRef = useRef(0);
+  const screenShareContainerRef = useRef<HTMLDivElement>(null);
+
+  // Check if screen sharing is active
+  const isScreenSharing = !isScreenShareMuted;
 
   useEffect(() => {
     lastParticipantCountRef.current = participants.length;
@@ -177,8 +185,20 @@ function ClassCallRoomInner({
   return (
     <div className="relative h-full bg-slate-950">
       <StreamTheme className="relative w-full h-full bg-transparent">
-        <div className="absolute inset-0 flex items-center justify-center pb-24">
+        <div 
+          ref={screenShareContainerRef}
+          className="absolute inset-0 flex items-center justify-center pb-24"
+        >
           <SpeakerLayout />
+          
+          {/* Screen Share Annotation Overlay */}
+          {isScreenSharing && activeSessionId && (
+            <ScreenShareAnnotation
+              sessionId={activeSessionId}
+              isTeacher={isTeacher}
+              screenShareElement={screenShareContainerRef.current}
+            />
+          )}
         </div>
       </StreamTheme>
 
@@ -494,6 +514,7 @@ export function ClassCallRoom({
         onMuteAll={handleMuteAll}
         onLeave={onLeave}
         onEndForAll={handleEndForAll}
+        activeSessionId={activeSession?._id}
       />
     </StreamCall>
   );

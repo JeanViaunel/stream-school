@@ -210,3 +210,37 @@ export const endVideoCall = internalAction({
     return null;
   },
 });
+
+export const getSessionChatMessages = internalAction({
+  args: {
+    channelId: v.string(),
+  },
+  returns: v.array(v.object({
+    user: v.string(),
+    text: v.string(),
+    timestamp: v.optional(v.number()),
+  })),
+  handler: async (_ctx, { channelId }) => {
+    const chatClient = StreamChat.getInstance(
+      process.env.STREAM_API_KEY!,
+      process.env.STREAM_API_SECRET!
+    );
+    
+    const channel = chatClient.channel("classroom", channelId);
+    
+    try {
+      const response = await channel.query({
+        messages: { limit: 200 },
+      });
+      
+      return (response.messages || []).map((msg: any) => ({
+        user: msg.user?.name || msg.user?.id || "Unknown",
+        text: msg.text || "",
+        timestamp: msg.created_at ? new Date(msg.created_at).getTime() : undefined,
+      }));
+    } catch (error) {
+      console.error("Failed to fetch chat messages:", error);
+      return [];
+    }
+  },
+});

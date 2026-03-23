@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B4513"/>
+      <stop offset="50%" style="stop-color:#D2691E"/>
+      <stop offset="100%" style="stop-color:#CD853F"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect x="100" y="100" width="300" height="400" fill="#8B4513" opacity="0.3"/>
+  <rect x="1520" y="100" width="300" height="400" fill="#8B4513" opacity="0.3"/>
+  <rect x="660" y="600" width="600" height="300" fill="#DEB887" opacity="0.4"/>
+  <text x="960" y="540" font-family="system-ui" font-size="120" fill="rgba(255,255,255,0.3)" text-anchor="middle">🏫</text>
+</svg>

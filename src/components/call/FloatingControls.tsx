@@ -38,6 +38,8 @@ import { Slider } from "@/components/ui/slider";
 import { LayoutSwitcher, type CallLayout } from "./LayoutSwitcher";
 import { VolumeIndicator } from "./VolumeVisualizer";
 import { ToggleClosedCaptions } from "./ToggleClosedCaptions";
+import { VirtualBackgroundToggle } from "./VirtualBackgroundToggle";
+import { LiveReactions } from "./LiveReactions";
 
 interface ControlButtonProps {
   onClick: () => void;
@@ -228,6 +230,8 @@ export function FloatingControls({
             label={isScreenSharing ? "Stop sharing" : "Share screen"}
           />
           <ToggleClosedCaptions variant="icon" />
+          <VirtualBackgroundToggle />
+          <LiveReactions />
         </div>
 
         {/* Divider */}

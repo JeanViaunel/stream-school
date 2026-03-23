@@ -108,6 +108,9 @@ export default defineSchema({
     recordingConsentRequired: v.boolean(),
     recordingStartedAt: v.optional(v.number()),
     recordingEndedAt: v.optional(v.number()),
+    summary: v.optional(v.string()),
+    summaryGeneratedAt: v.optional(v.number()),
+    summaryKeyPoints: v.optional(v.array(v.string())),
     annotations: v.optional(v.array(v.object({
       id: v.string(),
       userId: v.id("users"),
@@ -124,6 +127,11 @@ export default defineSchema({
       }),
       timestamp: v.number(),
       page: v.optional(v.number()),
+    }))),
+    liveReactions: v.optional(v.array(v.object({
+      userId: v.id("users"),
+      emoji: v.string(),
+      timestamp: v.number(),
     }))),
   })
     .index("by_class", ["classId"])
@@ -476,4 +484,17 @@ export default defineSchema({
     .index("by_target_and_time", ["targetId", "accessedAt"])
     .index("by_actor", ["actorId"])
     .index("by_organization", ["organizationId"]),
+
+  // AI Usage Tracking for rate limiting
+  aiUsageLogs: defineTable({
+    userId: v.id("users"),
+    feature: v.string(), // 'tutor', 'summary', 'quiz_generation', etc.
+    classId: v.optional(v.id("classes")),
+    sessionId: v.optional(v.id("sessions")),
+    timestamp: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_timestamp", ["userId", "timestamp"])
+    .index("by_class", ["classId"])
+    .index("by_session", ["sessionId"]),
 });
