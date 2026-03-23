@@ -1,8 +1,141 @@
-import { action, mutation, query, type QueryCtx } from "./_generated/server";
+import { action, mutation, query, internalMutation, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { usernameFromIdentity } from "./authHelpers";
+
+// CSV Import Types
+interface CSVRow {
+  username: string;
+  displayName: string;
+  password: string;
+  gradeLevel?: string;
+}
+
+interface ImportError {
+  row: number;
+  error: string;
+}
+
+interface ImportResult {
+  imported: number;
+  errors: ImportError[];
+}
+
+interface ValidationResult {
+  valid: boolean;
+  row: number;
+  data?: CSVRow;
+  error?: string;
+}
+
+// CSV Parsing Helper
+function parseCSV(csvData: string): CSVRow[] {
+  const lines = csvData.trim().split("\n");
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+  const rows: CSVRow[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Handle quoted values and commas within fields
+    const values: string[] = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim());
+
+    const row: Partial<CSVRow> = {};
+    headers.forEach((header, index) => {
+      const value = values[index]?.trim() || "";
+      if (header === "username") row.username = value;
+      else if (header === "displayname") row.displayName = value;
+      else if (header === "password") row.password = value;
+      else if (header === "gradelevel") row.gradeLevel = value;
+    });
+
+    if (row.username && row.displayName && row.password) {
+      rows.push(row as CSVRow);
+    }
+  }
+
+  return rows;
+}
+
+// Validate a single row
+function validateRow(row: CSVRow, rowIndex: number): ValidationResult {
+  // Check required fields
+  if (!row.username || !row.displayName || !row.password) {
+    return {
+      valid: false,
+      row: rowIndex,
+      error: "Missing required fields (username, displayName, password)",
+    };
+  }
+
+  // Validate username format
+  if (!/^[a-zA-Z0-9._-]+$/.test(row.username)) {
+    return {
+      valid: false,
+      row: rowIndex,
+      error: "Username can only contain letters, numbers, dots, underscores, and hyphens",
+    };
+  }
+
+  if (row.username.length < 3 || row.username.length > 50) {
+    return {
+      valid: false,
+      row: rowIndex,
+      error: "Username must be between 3 and 50 characters",
+    };
+  }
+
+  // Validate display name
+  if (row.displayName.length < 1 || row.displayName.length > 100) {
+    return {
+      valid: false,
+      row: rowIndex,
+      error: "Display name must be between 1 and 100 characters",
+    };
+  }
+
+  // Validate password strength
+  if (row.password.length < 8) {
+    return {
+      valid: false,
+      row: rowIndex,
+      error: "Password must be at least 8 characters long",
+    };
+  }
+
+  // Validate grade level if provided
+  if (row.gradeLevel !== undefined && row.gradeLevel !== "") {
+    const grade = parseInt(row.gradeLevel, 10);
+    if (isNaN(grade) || grade < 1 || grade > 12) {
+      return {
+        valid: false,
+        row: rowIndex,
+        error: "Grade level must be a number between 1 and 12",
+      };
+    }
+  }
+
+  return { valid: true, row: rowIndex, data: row };
+}
 
 /** Users with no `organizationId` are omitted from `by_organization`; merge them for the canonical default org or single-tenant deployments. */
 async function collectUsersForOrg(
@@ -637,5 +770,362 @@ export const updateMyOrganization = mutation({
     });
 
     return null;
+  },
+});
+
+// Bulk Import Students - Validation Only (Preview)
+export const validateImportData = action({
+  args: {
+    classId: v.id("classes"),
+    csvData: v.string(),
+  },
+  returns: v.object({
+    totalRows: v.number(),
+    validRows: v.number(),
+    invalidRows: v.number(),
+    duplicates: v.array(v.object({
+      row: v.number(),
+      username: v.string(),
+    })),
+    existingUsers: v.array(v.object({
+      row: v.number(),
+      username: v.string(),
+    })),
+    errors: v.array(v.object({
+      row: v.number(),
+      error: v.string(),
+    })),
+    preview: v.array(v.object({
+      row: v.number(),
+      username: v.string(),
+      displayName: v.string(),
+      gradeLevel: v.optional(v.number()),
+    })),
+  }),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const currentUser = await ctx.runQuery(internal.users.getUserByUsername, {
+      username: usernameFromIdentity(identity),
+    });
+
+    if (!currentUser) throw new Error("User not found");
+
+    // Verify access to class
+    const cls = await ctx.runQuery(internal.classes.getClassByIdInternal, {
+      classId: args.classId,
+    });
+
+    if (!cls) throw new Error("Class not found");
+
+    // Check authorization (admin or teacher of this class)
+    const isAuthorized =
+      currentUser.role === "admin" ||
+      (currentUser.role === "teacher" && cls.teacherId === currentUser._id);
+
+    if (!isAuthorized) {
+      throw new Error("Not authorized to import students to this class");
+    }
+
+    // Parse CSV
+    const rows = parseCSV(args.csvData);
+    const errors: ImportError[] = [];
+    const duplicates: Array<{ row: number; username: string }> = [];
+    const existingUsers: Array<{ row: number; username: string }> = [];
+    const preview: Array<{ row: number; username: string; displayName: string; gradeLevel?: number }> = [];
+
+    // Track usernames in this import to detect duplicates
+    const seenUsernames = new Set<string>();
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowIndex = i + 2; // +2 because row 1 is header
+
+      // Validate row format
+      const validation = validateRow(row, rowIndex);
+      if (!validation.valid) {
+        errors.push({ row: rowIndex, error: validation.error! });
+        continue;
+      }
+
+      // Check for duplicate in this import
+      if (seenUsernames.has(row.username.toLowerCase())) {
+        duplicates.push({ row: rowIndex, username: row.username });
+        continue;
+      }
+      seenUsernames.add(row.username.toLowerCase());
+
+      // Check if user already exists
+      const existingUser = await ctx.runQuery(internal.users.getUserByUsername, {
+        username: row.username,
+      });
+
+      if (existingUser) {
+        existingUsers.push({ row: rowIndex, username: row.username });
+        continue;
+      }
+
+      // Add to preview
+      const gradeLevel = row.gradeLevel ? parseInt(row.gradeLevel, 10) : undefined;
+      preview.push({
+        row: rowIndex,
+        username: row.username,
+        displayName: row.displayName,
+        gradeLevel,
+      });
+    }
+
+    return {
+      totalRows: rows.length,
+      validRows: preview.length,
+      invalidRows: errors.length,
+      duplicates,
+      existingUsers,
+      errors,
+      preview,
+    };
+  },
+});
+
+// Bulk Import Students - Execute Import
+export const bulkImportStudents = action({
+  args: {
+    classId: v.id("classes"),
+    csvData: v.string(),
+  },
+  returns: v.object({
+    imported: v.number(),
+    errors: v.array(v.object({
+      row: v.number(),
+      error: v.string(),
+    })),
+    importLogId: v.optional(v.id("importLogs")),
+  }),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const currentUser = await ctx.runQuery(internal.users.getUserByUsername, {
+      username: usernameFromIdentity(identity),
+    });
+
+    if (!currentUser) throw new Error("User not found");
+
+    // Verify access to class
+    const cls = await ctx.runQuery(internal.classes.getClassByIdInternal, {
+      classId: args.classId,
+    });
+
+    if (!cls) throw new Error("Class not found");
+
+    // Check authorization
+    const isAuthorized =
+      currentUser.role === "admin" ||
+      (currentUser.role === "teacher" && cls.teacherId === currentUser._id);
+
+    if (!isAuthorized) {
+      throw new Error("Not authorized to import students to this class");
+    }
+
+    // Parse CSV
+    const rows = parseCSV(args.csvData);
+    const errors: ImportError[] = [];
+    let imported = 0;
+    const importedUserIds: Id<"users">[] = [];
+
+    // Track usernames in this import
+    const seenUsernames = new Set<string>();
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowIndex = i + 2;
+
+      try {
+        // Validate row
+        const validation = validateRow(row, rowIndex);
+        if (!validation.valid) {
+          errors.push({ row: rowIndex, error: validation.error! });
+          continue;
+        }
+
+        // Check for duplicate in this import
+        if (seenUsernames.has(row.username.toLowerCase())) {
+          errors.push({ row: rowIndex, error: "Duplicate username in import file" });
+          continue;
+        }
+        seenUsernames.add(row.username.toLowerCase());
+
+        // Check if user already exists
+        const existingUser = await ctx.runQuery(internal.users.getUserByUsername, {
+          username: row.username,
+        });
+
+        if (existingUser) {
+          errors.push({ row: rowIndex, error: "Username already exists" });
+          continue;
+        }
+
+        // Hash password
+        const bcrypt = await import("bcryptjs");
+        const passwordHash = await bcrypt.hash(row.password, 10);
+
+        // Create user
+        const streamUserId = `user_${row.username}`;
+        const userId = await ctx.runMutation(internal.users.createUser, {
+          username: row.username,
+          passwordHash,
+          displayName: row.displayName,
+          streamUserId,
+          role: "student",
+          organizationId: currentUser.organizationId,
+          gradeLevel: row.gradeLevel ? parseInt(row.gradeLevel, 10) : undefined,
+          isActive: true,
+        });
+
+        importedUserIds.push(userId);
+
+        // Enroll in class
+        await ctx.runMutation(internal.classes.upsertEnrollment, {
+          classId: args.classId,
+          studentId: userId,
+        });
+
+        // Add to Stream channel
+        await ctx.runAction(internal.stream.addMemberToChannel, {
+          channelId: cls.streamChannelId,
+          streamUserId,
+        });
+
+        // Create Stream user
+        await ctx.runAction(internal.stream.upsertStreamUser, {
+          userId: streamUserId,
+          displayName: row.displayName,
+        });
+
+        imported++;
+      } catch (error) {
+        errors.push({ row: rowIndex, error: (error as Error).message });
+      }
+    }
+
+    // Create import log
+    let importLogId: Id<"importLogs"> | undefined;
+    if (currentUser.organizationId) {
+      importLogId = await ctx.runMutation(internal.admin.createImportLog, {
+        organizationId: currentUser.organizationId,
+        classId: args.classId,
+        importedBy: currentUser._id,
+        totalRows: rows.length,
+        importedCount: imported,
+        errorCount: errors.length,
+        errors: errors.map(e => `${e.row}: ${e.error}`).join("; "),
+      });
+    }
+
+    // Log audit action
+    await ctx.runMutation(internal.auditLog.logAction, {
+      organizationId: currentUser.organizationId || cls.organizationId,
+      actorId: currentUser._id,
+      action: "bulk_import_students",
+      targetId: args.classId,
+      targetType: "class",
+      metadata: JSON.stringify({
+        imported,
+        errors: errors.length,
+        importLogId,
+      }),
+    });
+
+    return { imported, errors, importLogId };
+  },
+});
+
+// Create import log entry
+export const createImportLog = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    classId: v.id("classes"),
+    importedBy: v.id("users"),
+    totalRows: v.number(),
+    importedCount: v.number(),
+    errorCount: v.number(),
+    errors: v.optional(v.string()),
+  },
+  returns: v.id("importLogs"),
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("importLogs", {
+      ...args,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+// Get import logs for a class
+export const getImportLogs = query({
+  args: {
+    classId: v.id("classes"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(v.object({
+    _id: v.id("importLogs"),
+    _creationTime: v.number(),
+    importedBy: v.object({
+      displayName: v.string(),
+      username: v.string(),
+    }),
+    totalRows: v.number(),
+    importedCount: v.number(),
+    errorCount: v.number(),
+    createdAt: v.number(),
+  })),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!currentUser) throw new Error("User not found");
+
+    // Verify access to class
+    const cls = await ctx.db.get(args.classId);
+    if (!cls) throw new Error("Class not found");
+
+    const isAuthorized =
+      currentUser.role === "admin" ||
+      (currentUser.role === "teacher" && cls.teacherId === currentUser._id);
+
+    if (!isAuthorized) {
+      throw new Error("Not authorized to view import logs");
+    }
+
+    const logs = await ctx.db
+      .query("importLogs")
+      .withIndex("by_class", (q) => q.eq("classId", args.classId))
+      .order("desc")
+      .take(args.limit || 50);
+
+    const results = await Promise.all(
+      logs.map(async (log) => {
+        const importer = await ctx.db.get(log.importedBy);
+        return {
+          _id: log._id,
+          _creationTime: log._creationTime,
+          importedBy: {
+            displayName: importer?.displayName || "Unknown",
+            username: importer?.username || "unknown",
+          },
+          totalRows: log.totalRows,
+          importedCount: log.importedCount,
+          errorCount: log.errorCount,
+          createdAt: log.createdAt,
+        };
+      })
+    );
+
+    return results;
   },
 });

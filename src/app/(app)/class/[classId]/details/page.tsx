@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/../convex/_generated/api";
@@ -10,12 +10,16 @@ import { ClassSidebar } from "@/components/class/ClassSidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { BulkImportModal } from "@/components/admin/BulkImportModal";
+import { Button } from "@/components/ui/button";
+import { Upload, Users } from "lucide-react";
 
 export default function ClassDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { session } = useAuth();
   const classId = params.classId as string;
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const detail = useQuery(api.classes.getClassManagementDetail, {
     classId: classId as Id<"classes">,
@@ -45,6 +49,12 @@ export default function ClassDetailsPage() {
     }
   };
 
+  const handleImportSuccess = () => {
+    toast.success("Students imported successfully");
+    // Refresh the page to show new students
+    router.refresh();
+  };
+
   if (detail === undefined) {
     return (
       <div className="flex h-screen">
@@ -63,12 +73,38 @@ export default function ClassDetailsPage() {
   }
 
   const isAdmin = session?.role === "admin";
+  const isTeacher = session?.role === "teacher";
+  const canBulkImport = isAdmin || (isTeacher && detail.teacherId === session?.userId);
 
   return (
-    <ClassDetailView
-      detail={detail}
-      isAdmin={isAdmin}
-      onArchiveClass={isAdmin ? handleArchiveClass : undefined}
-    />
+    <>
+      <ClassDetailView
+        detail={detail}
+        isAdmin={isAdmin}
+        onArchiveClass={isAdmin ? handleArchiveClass : undefined}
+      />
+      
+      {/* Bulk Import Button - Floating Action */}
+      {canBulkImport && (
+        <div className="fixed bottom-6 right-6 flex gap-2">
+          <Button
+            onClick={() => setIsImportModalOpen(true)}
+            className="gap-2 shadow-lg"
+            size="lg"
+          >
+            <Upload className="h-4 w-4" />
+            Bulk Import Students
+          </Button>
+        </div>
+      )}
+
+      {/* Bulk Import Modal */}
+      <BulkImportModal
+        classId={classId as Id<"classes">}
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={handleImportSuccess}
+      />
+    </>
   );
 }

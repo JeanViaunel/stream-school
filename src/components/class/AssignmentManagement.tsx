@@ -15,7 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { format, isPast, isToday, isTomorrow } from "date-fns";
 import { FileText, Plus, Clock, CheckCircle2, AlertCircle, BarChart3, Eye } from "lucide-react";
 import { toast } from "sonner";
-import { AssignmentStatsView } from "@/components/assignments/AssignmentStatsView";
+import { AssignmentStats } from "@/components/analytics";
 
 interface AssignmentManagementProps {
   classId: Id<"classes">;
@@ -157,7 +157,7 @@ export function AssignmentManagement({ classId, teacherId }: AssignmentManagemen
 
       {/* Assignment Stats Modal */}
       {selectedAssignmentId && (
-        <AssignmentStatsView
+        <AssignmentStats
           assignmentId={selectedAssignmentId}
           classId={classId}
           onClose={() => setSelectedAssignmentId(null)}

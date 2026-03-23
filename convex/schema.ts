@@ -128,9 +128,28 @@ export default defineSchema({
     sessionId: v.optional(v.id("sessions")),
     isPublished: v.boolean(),
     createdAt: v.number(),
+    timeLimitMinutes: v.optional(v.number()),
+    allowLateSubmissions: v.optional(v.boolean()),
   })
     .index("by_class", ["classId"])
     .index("by_session", ["sessionId"]),
+
+  quizAttempts: defineTable({
+    assignmentId: v.id("assignments"),
+    studentId: v.id("users"),
+    startedAt: v.number(),
+    submittedAt: v.optional(v.number()),
+    status: v.union(v.literal("in_progress"), v.literal("completed"), v.literal("expired")),
+    answers: v.array(v.object({
+      questionId: v.string(),
+      value: v.string(),
+    })),
+    submissionId: v.optional(v.id("submissions")),
+  })
+    .index("by_assignment", ["assignmentId"])
+    .index("by_student", ["studentId"])
+    .index("by_student_and_assignment", ["studentId", "assignmentId"])
+    .index("by_status", ["status"]),
 
   submissions: defineTable({
     assignmentId: v.id("assignments"),
@@ -326,4 +345,68 @@ export default defineSchema({
     .index("by_student", ["studentId"])
     .index("by_milestone", ["milestoneId"])
     .index("by_student_and_milestone", ["studentId", "milestoneId"]),
+
+  breakoutRooms: defineTable({
+    sessionId: v.id("sessions"),
+    name: v.string(),
+    streamCallId: v.string(),
+    createdAt: v.number(),
+    endedAt: v.optional(v.number()),
+  })
+    .index("by_session", ["sessionId"]),
+
+  breakoutRoomAssignments: defineTable({
+    roomId: v.id("breakoutRooms"),
+    userId: v.id("users"),
+    assignedAt: v.number(),
+    joinedAt: v.optional(v.number()),
+    sessionId: v.id("sessions"),
+  })
+    .index("by_room", ["roomId"])
+    .index("by_user_and_session", ["userId", "sessionId"]),
+
+  questionBanks: defineTable({
+    organizationId: v.id("organizations"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    subject: v.optional(v.string()),
+    gradeLevel: v.optional(v.number()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_organization", ["organizationId"])
+    .index("by_organization_and_subject", ["organizationId", "subject"])
+    .index("by_organization_and_grade", ["organizationId", "gradeLevel"]),
+
+  questionBankItems: defineTable({
+    bankId: v.id("questionBanks"),
+    question: v.object({
+      id: v.string(),
+      text: v.string(),
+      type: v.union(v.literal("multiple_choice"), v.literal("short_answer")),
+      options: v.optional(v.array(v.string())),
+      correctOption: v.optional(v.number()),
+      explanation: v.optional(v.string()),
+      difficulty: v.optional(v.union(v.literal("easy"), v.literal("medium"), v.literal("hard"))),
+      tags: v.optional(v.array(v.string())),
+    }),
+    usageCount: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_bank", ["bankId"])
+    .index("by_bank_and_difficulty", ["bankId", "question.difficulty"]),
+
+  importLogs: defineTable({
+    organizationId: v.id("organizations"),
+    classId: v.id("classes"),
+    importedBy: v.id("users"),
+    totalRows: v.number(),
+    importedCount: v.number(),
+    errorCount: v.number(),
+    errors: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_organization", ["organizationId"])
+    .index("by_class", ["classId"])
+    .index("by_imported_by", ["importedBy"]),
 });

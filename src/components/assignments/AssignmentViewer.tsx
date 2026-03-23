@@ -11,10 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
-import { CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, Send } from "lucide-react";
+import { CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, Send, Timer } from "lucide-react";
 import { useGradeSkin } from "@/contexts/GradeSkinContext";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
+import { TimeLimitedQuizView } from "@/components/quizzes/TimeLimitedQuizView";
 
 interface AssignmentViewerProps {
   assignmentId: Id<"assignments">;
@@ -53,6 +54,16 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
           <div className="text-center text-muted-foreground">Assignment not found</div>
         </CardContent>
       </Card>
+    );
+  }
+
+  // If this is a time-limited quiz and student hasn't submitted yet, show the time-limited view
+  if (assignment.timeLimitMinutes && !mySubmission) {
+    return (
+      <TimeLimitedQuizView 
+        assignmentId={assignmentId} 
+        onSubmitted={() => window.location.reload()}
+      />
     );
   }
 
@@ -214,12 +225,20 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
 
         <CardHeader>
           <CardTitle className="text-xl">{assignment.title}</CardTitle>
-          {assignment.dueDateAt && (
-            <CardDescription className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              Due {format(assignment.dueDateAt, "PPP")}
-            </CardDescription>
-          )}
+          <CardDescription className="flex items-center gap-2 flex-wrap">
+            {assignment.dueDateAt && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Due {format(assignment.dueDateAt, "PPP")}
+              </span>
+            )}
+            {assignment.timeLimitMinutes && (
+              <span className="flex items-center gap-1 text-amber-600">
+                <Timer className="h-3 w-3" />
+                {assignment.timeLimitMinutes} min time limit
+              </span>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -321,12 +340,20 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
             <CardTitle>{assignment.title}</CardTitle>
             <CardDescription className="mt-1">{assignment.instructions}</CardDescription>
           </div>
-          {assignment.dueDateAt && (
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              Due {format(assignment.dueDateAt, "PPP")}
-            </Badge>
-          )}
+          <div className="flex flex-col items-end gap-1">
+            {assignment.dueDateAt && (
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Due {format(assignment.dueDateAt, "PPP")}
+              </Badge>
+            )}
+            {assignment.timeLimitMinutes && (
+              <Badge variant="secondary" className="flex items-center gap-1 text-amber-600">
+                <Timer className="h-3 w-3" />
+                {assignment.timeLimitMinutes} min limit
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">

@@ -2,7 +2,7 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { usernameFromIdentity } from "./authHelpers";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 
 export const submitAnswers = mutation({
   args: {
@@ -103,6 +103,12 @@ export const submitAnswers = mutation({
         classId: assignment.classId,
       });
     }
+
+    // Recalculate student progress
+    await ctx.runMutation(internal.progress.calculateStudentProgress, {
+      studentId: user._id,
+      classId: assignment.classId,
+    });
 
     return submissionId;
   },

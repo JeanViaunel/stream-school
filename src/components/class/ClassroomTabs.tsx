@@ -13,7 +13,8 @@ import { Gradebook } from "@/components/gradebook/Gradebook";
 import { ClassOverview } from "./ClassOverview";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
-import { ExternalLink, Video, LayoutDashboard, MessageSquare, GraduationCap, Calendar, FileText } from "lucide-react";
+import { ExternalLink, Video, LayoutDashboard, MessageSquare, GraduationCap, Calendar, FileText, BarChart3 } from "lucide-react";
+import { GradebookAnalytics } from "@/components/analytics";
 import { AssignmentManagement } from "./AssignmentManagement";
 
 interface ClassroomTabsProps {
@@ -81,6 +82,12 @@ export function ClassroomTabs({ classId, teacherId, chatPanel, className = "Clas
             <Calendar className="h-4 w-4" />
             <span className="hidden sm:inline">Sessions</span>
           </TabsTrigger>
+          {isTeacherOrAdmin && (
+            <TabsTrigger value="analytics" className="rounded-md px-3 flex items-center gap-1.5">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Analytics</span>
+            </TabsTrigger>
+          )}
         </TabsList>
       </div>
 
@@ -236,6 +243,15 @@ export function ClassroomTabs({ classId, teacherId, chatPanel, className = "Clas
           </CardContent>
         </Card>
       </TabsContent>
+
+      {isTeacherOrAdmin && (
+        <TabsContent
+          value="analytics"
+          className="mt-0 flex-1 overflow-auto p-4 data-[state=inactive]:hidden"
+        >
+          <GradebookAnalytics classId={classId} />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

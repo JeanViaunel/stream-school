@@ -137,6 +137,16 @@ export const logJoin = internalMutation({
       wasAdmittedFromLobby: args.wasAdmittedFromLobby,
     });
 
+    // Get session to find classId for progress recalculation
+    const session = await ctx.db.get(args.sessionId);
+    if (session) {
+      // Recalculate student progress
+      await ctx.runMutation(internal.progress.calculateStudentProgress, {
+        studentId: args.userId,
+        classId: session.classId,
+      });
+    }
+
     return logId;
   },
 });
@@ -371,6 +381,38 @@ export const getActiveSessionInternal = internalQuery({
       .first();
     if (!session || session.endedAt !== undefined) return null;
     return { _id: session._id, streamCallId: session.streamCallId };
+  },
+});
+
+export const getSessionByStreamCallIdInternal = internalQuery({
+  args: {
+    streamCallId: v.string(),
+  },
+  returns: v.union(
+    v.object({
+      _id: v.id("sessions"),
+      classId: v.id("classes"),
+      hostId: v.id("users"),
+      streamCallId: v.string(),
+      recordingUrl: v.optional(v.string()),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_stream_call_id", (q) => q.eq("streamCallId", args.streamCallId))
+      .first();
+    
+    if (!session) return null;
+    
+    return {
+      _id: session._id,
+      classId: session.classId,
+      hostId: session.hostId,
+      streamCallId: session.streamCallId,
+      recordingUrl: session.recordingUrl,
+    };
   },
 });
 
@@ -793,6 +835,89 @@ export const getTeachingSchedule = query({
         title: session.title,
         scheduledAt: session.scheduledAt,
         durationMinutes: session.durationMinutes,
+      });
+    }
+
+    return result;
+  },
+});
+
+export const getClassRecordings = query({
+  args: {
+    classId: v.id("classes"),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("sessions"),
+      startedAt: v.number(),
+      endedAt: v.optional(v.number()),
+      duration: v.optional(v.number()),
+      recordingUrl: v.optional(v.string()),
+      recordingStartedAt: v.optional(v.number()),
+      recordingEndedAt: v.optional(v.number()),
+      hostName: v.string(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const cls = await ctx.db.get(args.classId);
+    if (!cls) {
+      throw new Error("Class not found");
+    }
+
+    const isTeacher = cls.teacherId === user._id;
+    const isOrgAdmin =
+      user.role === "admin" &&
+      !!user.organizationId &&
+      user.organizationId === cls.organizationId;
+    const isEnrolled = await ctx.db
+      .query("enrollments")
+      .withIndex("by_class_and_student", (q) =>
+        q.eq("classId", args.classId).eq("studentId", user._id)
+      )
+      .unique();
+
+    if (!isTeacher && !isOrgAdmin && !isEnrolled) {
+      throw new Error("Not authorized to view recordings for this class");
+    }
+
+    // Get sessions that have recordings
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_class", (q) => q.eq("classId", args.classId))
+      .filter((q) => q.neq(q.field("recordingUrl"), undefined))
+      .order("desc")
+      .take(50);
+
+    const result = [];
+    for (const session of sessions) {
+      const host = await ctx.db.get(session.hostId);
+      const duration = session.endedAt
+        ? Math.round((session.endedAt - session.startedAt) / 1000)
+        : undefined;
+
+      result.push({
+        _id: session._id,
+        startedAt: session.startedAt,
+        endedAt: session.endedAt,
+        duration,
+        recordingUrl: session.recordingUrl,
+        recordingStartedAt: session.recordingStartedAt,
+        recordingEndedAt: session.recordingEndedAt,
+        hostName: host?.displayName || "Unknown",
       });
     }
 

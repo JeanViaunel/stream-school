@@ -32,6 +32,7 @@ import type * as parentLinks from "../parentLinks.js";
 import type * as polls from "../polls.js";
 import type * as privacy from "../privacy.js";
 import type * as privacyQueries from "../privacyQueries.js";
+import type * as progress from "../progress.js";
 import type * as recordings from "../recordings.js";
 import type * as s3 from "../s3.js";
 import type * as schedule from "../schedule.js";
@@ -72,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   polls: typeof polls;
   privacy: typeof privacy;
   privacyQueries: typeof privacyQueries;
+  progress: typeof progress;
   recordings: typeof recordings;
   s3: typeof s3;
   schedule: typeof schedule;

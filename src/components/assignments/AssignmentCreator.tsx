@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -30,11 +30,15 @@ import {
   ListTodo,
   AlignLeft,
   GripVertical,
-  X
+  X,
+  Timer,
+  BookOpen,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
+import { GenerateAssignmentModal } from "@/components/questionBanks/GenerateAssignmentModal";
 
 interface Question {
   id: string;
@@ -57,11 +61,14 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
     { id: crypto.randomUUID(), text: "", options: ["", ""], correctOption: 0 }
   ]);
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState<number | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeQuestion, setActiveQuestion] = useState<string | null>(null);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
 
   const createAssignment = useMutation(api.assignments.createAssignment);
   const publishAssignment = useMutation(api.assignments.publishAssignment);
+  const cls = useQuery(api.classes.getClassById, { classId });
 
   const addQuestion = () => {
     const newQuestion: Question = type === "multiple_choice"
@@ -173,6 +180,8 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
         })),
         dueDateAt: dueDate?.getTime(),
         sessionId,
+        timeLimitMinutes,
+        allowLateSubmissions: false,
       });
       onSuccess?.();
     } catch (error) {
@@ -200,6 +209,8 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
         })),
         dueDateAt: dueDate?.getTime(),
         sessionId,
+        timeLimitMinutes,
+        allowLateSubmissions: false,
       });
       
       await publishAssignment({ assignmentId });
@@ -232,12 +243,24 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
                 </p>
               </div>
             </div>
-            {completionPercentage === 100 && (
-              <Badge variant="default" className="bg-green-500">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Ready
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {cls?.organizationId && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowGenerateModal(true)}
+                  className="gap-2"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Create from Question Bank
+                </Button>
+              )}
+              {completionPercentage === 100 && (
+                <Badge variant="default" className="bg-green-500">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Ready
+                </Badge>
+              )}
+            </div>
           </div>
           
           {/* Progress Bar */}
@@ -332,7 +355,7 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
                   </Select>
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
+                <div className="space-y-2">
                   <Label className="text-base font-medium flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     Due Date
@@ -361,6 +384,38 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
                       />
                     </PopoverContent>
                   </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-base font-medium flex items-center gap-2">
+                    <Timer className="h-4 w-4 text-muted-foreground" />
+                    Time Limit
+                    <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <Select 
+                    value={timeLimitMinutes?.toString() || "none"} 
+                    onValueChange={(v) => setTimeLimitMinutes(v === "none" ? undefined : parseInt(v))}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="No time limit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No time limit</SelectItem>
+                      <SelectItem value="15">15 minutes</SelectItem>
+                      <SelectItem value="30">30 minutes</SelectItem>
+                      <SelectItem value="45">45 minutes</SelectItem>
+                      <SelectItem value="60">1 hour</SelectItem>
+                      <SelectItem value="90">1.5 hours</SelectItem>
+                      <SelectItem value="120">2 hours</SelectItem>
+                      <SelectItem value="180">3 hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {timeLimitMinutes && (
+                    <p className="text-xs text-amber-600">
+                      <AlertCircle className="h-3 w-3 inline mr-1" />
+                      Students will have {timeLimitMinutes} minutes to complete once started
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -595,6 +650,20 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
             {isSubmitting ? "Publishing..." : "Publish Assignment"}
           </Button>
         </div>
+
+        {/* Generate Assignment from Question Bank Modal */}
+        {cls?.organizationId && (
+          <GenerateAssignmentModal
+            classId={classId}
+            organizationId={cls.organizationId}
+            open={showGenerateModal}
+            onOpenChange={setShowGenerateModal}
+            onSuccess={(assignmentId) => {
+              setShowGenerateModal(false);
+              onSuccess?.();
+            }}
+          />
+        )}
       </div>
     </TooltipProvider>
   );
