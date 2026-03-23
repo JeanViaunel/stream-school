@@ -39,7 +39,7 @@ export default function AdminAuditLogPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-6xl p-6">
+    <div className="w-full px-4 md:px-6 py-6">
       <Link
         href="/admin"
         className={cn(buttonVariants({ variant: "ghost" }), "mb-6 inline-flex")}

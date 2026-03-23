@@ -30,7 +30,7 @@ export default function AdminAnalyticsPage() {
 
   if (session.role !== "school_admin" && session.role !== "platform_admin") {
     return (
-      <div className="container mx-auto p-6">
+      <div className="w-full px-4 md:px-6 py-6">
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">Redirecting…</CardContent>
         </Card>
@@ -39,7 +39,7 @@ export default function AdminAnalyticsPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-6xl p-6">
+    <div className="w-full px-4 md:px-6 py-6">
       <Link
         href="/admin"
         className={cn(buttonVariants({ variant: "ghost" }), "mb-6 inline-flex")}

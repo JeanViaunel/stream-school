@@ -53,7 +53,7 @@ export default function AdminClassesPage() {
   const archivedClasses = classes?.filter(c => c.isArchived) || [];
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="w-full px-4 md:px-6 py-6">
       <header className="mb-8">
         <Button variant="ghost" onClick={() => router.push("/admin")} className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />

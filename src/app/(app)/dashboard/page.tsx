@@ -88,7 +88,7 @@ export default function DashboardPage() {
           <CalendarView />
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
           {studentClasses?.map((cls) => (
             <Link key={cls._id} href={`/class/${cls._id}`}>
               <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
@@ -186,7 +186,7 @@ export default function DashboardPage() {
           <CalendarView />
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
           {teacherClasses?.map((cls) => (
             <Link key={cls._id} href={`/class/${cls._id}`}>
               <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">

@@ -39,11 +39,29 @@ export default function AdminUsersPage() {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
 
+  const ALL_ROLES = [
+    "student",
+    "teacher",
+    "co_teacher",
+    "parent",
+    "school_admin",
+    "platform_admin",
+  ] as const;
+  type UserRole = (typeof ALL_ROLES)[number];
+
+  const [roleDraftByUserId, setRoleDraftByUserId] = useState<Record<string, UserRole | "">>({});
+  const [updatingRoleUserId, setUpdatingRoleUserId] = useState<Id<"users"> | null>(null);
+
   // Form state for inviting user
-  const [inviteForm, setInviteForm] = useState({
+  const [inviteForm, setInviteForm] = useState<{
+    username: string;
+    displayName: string;
+    role: UserRole;
+    gradeLevel: string;
+  }>({
     username: "",
     displayName: "",
-    role: "student" as "student" | "teacher" | "parent" | "school_admin",
+    role: "student",
     gradeLevel: "",
   });
 
@@ -62,6 +80,7 @@ export default function AdminUsersPage() {
   const inviteUser = useAction(api.admin.inviteUser);
   const deactivateUser = useMutation(api.admin.deactivateUser);
   const reactivateUser = useMutation(api.admin.reactivateUser);
+  const updateUserRole = useMutation(api.admin.updateUserRole);
 
   const filteredUsers = users?.filter(user => 
     user.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -80,7 +99,10 @@ export default function AdminUsersPage() {
         username: inviteForm.username,
         displayName: inviteForm.displayName,
         role: inviteForm.role,
-        gradeLevel: inviteForm.gradeLevel ? parseInt(inviteForm.gradeLevel) : undefined,
+        gradeLevel:
+          inviteForm.role === "student" && inviteForm.gradeLevel
+            ? parseInt(inviteForm.gradeLevel)
+            : undefined,
       });
       toast.success("User invited successfully");
       setShowInviteDialog(false);
@@ -110,6 +132,7 @@ export default function AdminUsersPage() {
     switch (role) {
       case "student": return "bg-blue-500/20 text-blue-500";
       case "teacher": return "bg-green-500/20 text-green-500";
+      case "co_teacher": return "bg-teal-500/20 text-teal-500";
       case "parent": return "bg-purple-500/20 text-purple-500";
       case "school_admin": return "bg-red-500/20 text-red-500";
       case "platform_admin": return "bg-red-500/20 text-red-500";
@@ -119,8 +142,42 @@ export default function AdminUsersPage() {
 
   const getRoleLabel = (role?: string) => {
     if (!role) return "-";
-    if (role === "school_admin" || role === "platform_admin") return "admin";
+    if (role === "school_admin" || role === "platform_admin") return "Admin";
+    if (role === "co_teacher") return "Co-teacher";
     return role;
+  };
+
+  const handleUpdateUserRole = async (userId: Id<"users">) => {
+    if (!session) return;
+
+    const draft = roleDraftByUserId[userId];
+    const roleToSet = draft || (users?.find((u) => u._id === userId)?.role as UserRole | undefined);
+
+    if (!roleToSet || !ALL_ROLES.includes(roleToSet)) {
+      toast.error("Please select a valid role");
+      return;
+    }
+
+    // Server will enforce this too; we disable it for better UX.
+    if (session.userId === userId) {
+      toast.error("You cannot change your own role");
+      return;
+    }
+
+    setUpdatingRoleUserId(userId);
+    try {
+      await updateUserRole({ userId, role: roleToSet });
+      setRoleDraftByUserId((prev) => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+      toast.success("User role updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update user role");
+    } finally {
+      setUpdatingRoleUserId(null);
+    }
   };
 
   if (!session || (session.role !== "school_admin" && session.role !== "platform_admin")) {
@@ -128,7 +185,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="w-full px-4 md:px-6 py-6">
       <header className="mb-8">
         <Button variant="ghost" onClick={() => router.push("/admin")} className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -171,16 +228,27 @@ export default function AdminUsersPage() {
                   <label className="text-sm font-medium">Role</label>
                   <Select
                     value={inviteForm.role}
-                    onValueChange={(value: any) => setInviteForm({ ...inviteForm, role: value })}
+                    onValueChange={(value) => setInviteForm((prev) => ({ ...prev, role: value as UserRole }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="student">Student</SelectItem>
-                      <SelectItem value="teacher">Teacher</SelectItem>
-                      <SelectItem value="parent">Parent</SelectItem>
-                      <SelectItem value="school_admin">Admin</SelectItem>
+                      {ALL_ROLES.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {role === "student"
+                            ? "Student"
+                            : role === "teacher"
+                            ? "Teacher"
+                            : role === "co_teacher"
+                            ? "Co-teacher"
+                            : role === "parent"
+                            ? "Parent"
+                            : role === "school_admin"
+                            ? "Admin"
+                            : "Platform Admin"}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -269,7 +337,53 @@ export default function AdminUsersPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={getRoleBadgeColor(user.role)}>{getRoleLabel(user.role)}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className={getRoleBadgeColor(user.role)}>{getRoleLabel(user.role)}</Badge>
+                      {session.userId !== user._id && (
+                        <>
+                          <Select
+                            value={roleDraftByUserId[user._id] || (user.role ?? "")}
+                            onValueChange={(value) => {
+                              if (ALL_ROLES.includes(value as UserRole)) {
+                                setRoleDraftByUserId((prev) => ({
+                                  ...prev,
+                                  [user._id]: value as UserRole,
+                                }));
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-[170px]">
+                              <SelectValue placeholder="Set role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ALL_ROLES.map((role) => (
+                                <SelectItem key={role} value={role}>
+                                  {role === "student"
+                                    ? "Student"
+                                    : role === "teacher"
+                                    ? "Teacher"
+                                    : role === "co_teacher"
+                                    ? "Co-teacher"
+                                    : role === "parent"
+                                    ? "Parent"
+                                    : role === "school_admin"
+                                    ? "Admin"
+                                    : "Platform Admin"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleUpdateUserRole(user._id)}
+                            disabled={updatingRoleUserId === user._id}
+                          >
+                            {updatingRoleUserId === user._id ? "Updating..." : "Update"}
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {user.gradeLevel ? `Grade ${user.gradeLevel}` : "-"}

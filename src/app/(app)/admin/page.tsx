@@ -52,7 +52,7 @@ export default function AdminPage() {
 
   if (session.role !== "school_admin" && session.role !== "platform_admin") {
     return (
-      <div className="container mx-auto p-6">
+      <div className="w-full px-4 md:px-6 py-6">
         <Card>
           <CardContent className="p-8 text-center">
             <p className="text-muted-foreground">Redirecting...</p>
@@ -68,7 +68,7 @@ export default function AdminPage() {
   const totalClasses = stats?.totalClasses ?? 0;
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="w-full px-4 md:px-6 py-6">
       <header className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <Shield className="w-8 h-8 text-primary" />

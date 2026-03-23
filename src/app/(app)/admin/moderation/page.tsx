@@ -32,7 +32,7 @@ export default function AdminModerationPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="w-full px-4 md:px-6 py-6">
       <header className="mb-8">
         <Link href="/admin">
           <Button variant="ghost" className="mb-4 pl-0">

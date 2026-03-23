@@ -29,7 +29,8 @@ export const inviteUser = action({
       v.literal("teacher"),
       v.literal("co_teacher"),
       v.literal("parent"),
-      v.literal("school_admin")
+      v.literal("school_admin"),
+      v.literal("platform_admin")
     ),
     gradeLevel: v.optional(v.number()),
     email: v.optional(v.string()),
@@ -107,7 +108,8 @@ export const insertInvitedUser = internalMutation({
       v.literal("teacher"),
       v.literal("co_teacher"),
       v.literal("parent"),
-      v.literal("school_admin")
+      v.literal("school_admin"),
+      v.literal("platform_admin")
     ),
     organizationId: v.id("organizations"),
     gradeLevel: v.optional(v.number()),
@@ -215,19 +217,9 @@ export const getAllUsers = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    const adminUser = await ctx.db
-      .query("users")
-      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
-      .unique();
-
-    if (!adminUser || !adminUser.organizationId) throw new Error("Admin user not found");
-
-    const orgId = adminUser.organizationId;
-    const users = await ctx.db
-      .query("users")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .order("desc")
-      .take(50);
+    // Admins should be able to view ALL users, not only those in their org.
+    // (We still require the requester's identity to be an admin.)
+    const users = await ctx.db.query("users").collect();
 
     return users.map((u) => ({
       _id: u._id,
@@ -301,6 +293,62 @@ export const getDashboardStats = query({
       totalClasses,
       activeClasses,
     };
+  },
+});
+
+// Update a user's role (admins can update everyone except themselves).
+export const updateUserRole = mutation({
+  args: {
+    userId: v.id("users"),
+    role: v.union(
+      v.literal("student"),
+      v.literal("teacher"),
+      v.literal("co_teacher"),
+      v.literal("parent"),
+      v.literal("school_admin"),
+      v.literal("platform_admin")
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!(await isAdmin(ctx))) {
+      throw new Error("Only admins can update user roles");
+    }
+
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const adminUser = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+    if (!adminUser?.organizationId) throw new Error("Admin user not found");
+
+    if (args.userId === adminUser._id) {
+      throw new Error("You cannot change your own role");
+    }
+
+    const targetUser = await ctx.db.get(args.userId);
+    if (!targetUser) throw new Error("User not found");
+
+    // Keep admin operations scoped to the same organization.
+    if (targetUser.organizationId !== adminUser.organizationId) {
+      throw new Error("User not found");
+    }
+
+    const fromRole = targetUser.role ?? null;
+    await ctx.db.patch(args.userId, { role: args.role });
+
+    await ctx.runMutation(internal.auditLog.logAction, {
+      organizationId: adminUser.organizationId,
+      actorId: adminUser._id,
+      action: "user_role_updated",
+      targetId: args.userId,
+      targetType: "user",
+      metadata: JSON.stringify({ fromRole, toRole: args.role }),
+    });
+
+    return null;
   },
 });
 
