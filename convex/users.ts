@@ -252,3 +252,108 @@ export const getMyStats = query({
     };
   },
 });
+
+export const getTeacherStats = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      classesTaught: v.number(),
+      sessionsHosted: v.number(),
+      totalStudentsReached: v.number(),
+      totalTeachingHours: v.number(),
+      assignmentsCreated: v.number(),
+      averageClassSize: v.number(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) return null;
+
+    // Verify user is a teacher, co_teacher, or admin
+    const allowedRoles = ["teacher", "co_teacher", "admin"] as const;
+    if (!user.role || !allowedRoles.includes(user.role as typeof allowedRoles[number])) {
+      return null;
+    }
+
+    // Get all classes taught by this teacher
+    const classes = await ctx.db
+      .query("classes")
+      .withIndex("by_teacher", (q) => q.eq("teacherId", user._id))
+      .collect();
+
+    // Count unique students across all classes
+    const uniqueStudents = new Set<string>();
+    let totalClassSize = 0;
+
+    for (const cls of classes) {
+      const enrollments = await ctx.db
+        .query("enrollments")
+        .withIndex("by_class", (q) => q.eq("classId", cls._id))
+        .collect();
+
+      for (const enrollment of enrollments) {
+        if (enrollment.status === "active") {
+          uniqueStudents.add(enrollment.studentId);
+        }
+      }
+
+      totalClassSize += enrollments.filter((e) => e.status === "active").length;
+    }
+
+    // Get all sessions for these classes
+    let sessionsHosted = 0;
+    let totalTeachingMinutes = 0;
+
+    for (const cls of classes) {
+      const sessions = await ctx.db
+        .query("sessions")
+        .withIndex("by_class", (q) => q.eq("classId", cls._id))
+        .collect();
+
+      for (const session of sessions) {
+        if (session.hostId === user._id) {
+          sessionsHosted++;
+          if (session.endedAt && session.startedAt) {
+            totalTeachingMinutes += (session.endedAt - session.startedAt) / (1000 * 60);
+          }
+        }
+      }
+    }
+
+    // Count assignments created by this teacher
+    let assignmentsCreated = 0;
+
+    for (const cls of classes) {
+      const assignments = await ctx.db
+        .query("assignments")
+        .withIndex("by_class", (q) => q.eq("classId", cls._id))
+        .collect();
+
+      for (const assignment of assignments) {
+        if (assignment.creatorId === user._id) {
+          assignmentsCreated++;
+        }
+      }
+    }
+
+    // Calculate average class size
+    const averageClassSize = classes.length > 0 ? Math.round(totalClassSize / classes.length) : 0;
+
+    return {
+      classesTaught: classes.length,
+      sessionsHosted,
+      totalStudentsReached: uniqueStudents.size,
+      totalTeachingHours: Math.round(totalTeachingMinutes / 60),
+      assignmentsCreated,
+      averageClassSize,
+    };
+  },
+});

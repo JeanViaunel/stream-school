@@ -533,3 +533,269 @@ export const adminForceEndSession = action({
     return null;
   },
 });
+
+export const getSessionAnalytics = query({
+  args: {
+    sessionId: v.id("sessions"),
+  },
+  returns: v.object({
+    totalParticipants: v.number(),
+    totalJoins: v.number(),
+    averageDuration: v.number(),
+    peakConcurrentUsers: v.number(),
+    participantsList: v.array(
+      v.object({
+        userId: v.id("users"),
+        joinedAt: v.number(),
+        leftAt: v.optional(v.number()),
+        duration: v.number(),
+      })
+    ),
+    lobbyStats: v.object({
+      admittedCount: v.number(),
+      averageWaitTime: v.number(),
+    }),
+  }),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const cls = await ctx.db.get(session.classId);
+    if (!cls) {
+      throw new Error("Class not found");
+    }
+
+    const isTeacher = cls.teacherId === user._id;
+    const isOrgAdmin =
+      user.role === "admin" &&
+      !!user.organizationId &&
+      user.organizationId === cls.organizationId;
+
+    if (!isTeacher && !isOrgAdmin) {
+      throw new Error("Not authorized to view analytics for this session");
+    }
+
+    const sessionLogs = await ctx.db
+      .query("sessionLogs")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .collect();
+
+    const uniqueParticipants = new Set(sessionLogs.map((log) => log.userId)).size;
+    const totalJoins = sessionLogs.length;
+    const lobbyAdmissions = sessionLogs.filter((log) => log.wasAdmittedFromLobby);
+
+    let totalDuration = 0;
+    let validDurations = 0;
+    let totalWaitTime = 0;
+    let validWaitTimes = 0;
+    const participantsList: { userId: Id<"users">; joinedAt: number; leftAt?: number; duration: number }[] = [];
+    const activeUsers = new Map<Id<"users">, number>();
+    let peakConcurrentUsers = 0;
+    const events: { time: number; type: "join" | "leave"; userId: Id<"users"> }[] = [];
+
+    for (const log of sessionLogs) {
+      if (log.leftAt) {
+        const duration = log.leftAt - log.joinedAt;
+        totalDuration += duration;
+        validDurations++;
+        participantsList.push({
+          userId: log.userId,
+          joinedAt: log.joinedAt,
+          leftAt: log.leftAt,
+          duration: Math.round(duration / 1000),
+        });
+      } else {
+        participantsList.push({
+          userId: log.userId,
+          joinedAt: log.joinedAt,
+          duration: 0,
+        });
+      }
+
+      events.push({ time: log.joinedAt, type: "join", userId: log.userId });
+      if (log.leftAt) {
+        events.push({ time: log.leftAt, type: "leave", userId: log.userId });
+      }
+
+      if (log.wasAdmittedFromLobby) {
+        totalWaitTime += log.joinedAt - session.startedAt;
+        validWaitTimes++;
+      }
+    }
+
+    events.sort((a, b) => a.time - b.time);
+    let currentConcurrent = 0;
+    for (const event of events) {
+      if (event.type === "join") {
+        currentConcurrent++;
+        peakConcurrentUsers = Math.max(peakConcurrentUsers, currentConcurrent);
+      } else {
+        currentConcurrent--;
+      }
+    }
+
+    const averageDuration = validDurations > 0 ? Math.round(totalDuration / validDurations / 1000) : 0;
+    const averageWaitTime = validWaitTimes > 0 ? Math.round(totalWaitTime / validWaitTimes / 1000) : 0;
+
+    return {
+      totalParticipants: uniqueParticipants,
+      totalJoins,
+      averageDuration,
+      peakConcurrentUsers,
+      participantsList,
+      lobbyStats: {
+        admittedCount: lobbyAdmissions.length,
+        averageWaitTime,
+      },
+    };
+  },
+});
+
+export const getClassSessionHistory = query({
+  args: {
+    classId: v.id("classes"),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("sessions"),
+      startedAt: v.number(),
+      endedAt: v.optional(v.number()),
+      duration: v.optional(v.number()),
+      attendanceCount: v.number(),
+      recordingUrl: v.optional(v.string()),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const cls = await ctx.db.get(args.classId);
+    if (!cls) {
+      throw new Error("Class not found");
+    }
+
+    const isTeacher = cls.teacherId === user._id;
+    const isOrgAdmin =
+      user.role === "admin" &&
+      !!user.organizationId &&
+      user.organizationId === cls.organizationId;
+
+    if (!isTeacher && !isOrgAdmin) {
+      throw new Error("Not authorized to view session history for this class");
+    }
+
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_class_and_started_at", (q) => q.eq("classId", args.classId))
+      .order("desc")
+      .take(20);
+
+    const result = [];
+    for (const session of sessions) {
+      const sessionLogs = await ctx.db
+        .query("sessionLogs")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .collect();
+
+      const uniqueParticipants = new Set(sessionLogs.map((log) => log.userId)).size;
+      const duration = session.endedAt ? Math.round((session.endedAt - session.startedAt) / 1000) : undefined;
+
+      result.push({
+        _id: session._id,
+        startedAt: session.startedAt,
+        endedAt: session.endedAt,
+        duration,
+        attendanceCount: uniqueParticipants,
+        recordingUrl: session.recordingUrl,
+      });
+    }
+
+    return result;
+  },
+});
+
+export const getTeachingSchedule = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id("scheduledSessions"),
+      classId: v.id("classes"),
+      className: v.string(),
+      title: v.string(),
+      scheduledAt: v.number(),
+      durationMinutes: v.number(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const hasTeacherRole = user.role === "teacher" || user.role === "co_teacher" || user.role === "admin";
+    if (!hasTeacherRole) {
+      throw new Error("Only teachers can view teaching schedule");
+    }
+
+    const scheduledSessions = await ctx.db
+      .query("scheduledSessions")
+      .withIndex("by_teacher_and_scheduled_at", (q) => q.eq("teacherId", user._id))
+      .order("asc")
+      .collect();
+
+    const upcomingSessions = scheduledSessions.filter((s) => !s.isArchived && s.scheduledAt >= Date.now());
+
+    const result = [];
+    for (const session of upcomingSessions) {
+      const cls = await ctx.db.get(session.classId);
+      if (!cls) continue;
+
+      result.push({
+        _id: session._id,
+        classId: session.classId,
+        className: cls.name,
+        title: session.title,
+        scheduledAt: session.scheduledAt,
+        durationMinutes: session.durationMinutes,
+      });
+    }
+
+    return result;
+  },
+});

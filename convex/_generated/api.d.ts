@@ -37,6 +37,7 @@ import type * as schedule from "../schedule.js";
 import type * as sessions from "../sessions.js";
 import type * as stream from "../stream.js";
 import type * as submissions from "../submissions.js";
+import type * as teachers from "../teachers.js";
 import type * as users from "../users.js";
 
 import type {
@@ -75,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   sessions: typeof sessions;
   stream: typeof stream;
   submissions: typeof submissions;
+  teachers: typeof teachers;
   users: typeof users;
 }>;
 

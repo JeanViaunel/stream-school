@@ -508,3 +508,527 @@ export const getMyAssignments = query({
     return assignments;
   },
 });
+
+export const getAssignmentCompletionStats = query({
+  args: {
+    assignmentId: v.id("assignments"),
+  },
+  returns: v.object({
+    totalStudents: v.number(),
+    submittedCount: v.number(),
+    submissionRate: v.number(),
+    averageScore: v.optional(v.number()),
+    gradeDistribution: v.array(v.object({
+      range: v.string(),
+      count: v.number(),
+    })),
+    lateSubmissions: v.number(),
+    notSubmitted: v.array(v.id("users")),
+  }),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const assignment = await ctx.db.get(args.assignmentId);
+    if (!assignment) {
+      throw new Error("Assignment not found");
+    }
+
+    const cls = await ctx.db.get(assignment.classId);
+    if (!cls) {
+      throw new Error("Class not found");
+    }
+
+    if (cls.teacherId !== user._id) {
+      throw new Error("Only the teacher can view assignment completion stats");
+    }
+
+    // Get all enrolled students
+    const enrollments = await ctx.db
+      .query("enrollments")
+      .withIndex("by_class", (q) => q.eq("classId", assignment.classId))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+
+    const studentIds = enrollments.map((e) => e.studentId);
+    const totalStudents = studentIds.length;
+
+    // Get all submissions for this assignment
+    const submissions = await ctx.db
+      .query("submissions")
+      .withIndex("by_assignment", (q) => q.eq("assignmentId", args.assignmentId))
+      .collect();
+
+    const submittedCount = submissions.length;
+    const submissionRate = totalStudents > 0 ? (submittedCount / totalStudents) * 100 : 0;
+
+    // Get all grades for this assignment
+    const grades = await ctx.db
+      .query("grades")
+      .withIndex("by_assignment", (q) => q.eq("assignmentId", args.assignmentId))
+      .collect();
+
+    // Calculate average score
+    let averageScore: number | undefined;
+    if (grades.length > 0) {
+      const totalScore = grades.reduce((sum, g) => sum + g.score, 0);
+      averageScore = totalScore / grades.length;
+    }
+
+    // Build grade distribution histogram
+    const distribution = new Map<string, number>();
+    const ranges = [
+      { min: 90, max: 100, label: "90-100" },
+      { min: 80, max: 89, label: "80-89" },
+      { min: 70, max: 79, label: "70-79" },
+      { min: 60, max: 69, label: "60-69" },
+      { min: 0, max: 59, label: "Below 60" },
+    ];
+
+    ranges.forEach((r) => distribution.set(r.label, 0));
+
+    for (const grade of grades) {
+      const percentage = (grade.score / grade.maxScore) * 100;
+      const range = ranges.find((r) => percentage >= r.min && percentage <= r.max);
+      if (range) {
+        distribution.set(range.label, (distribution.get(range.label) || 0) + 1);
+      }
+    }
+
+    const gradeDistribution = Array.from(distribution.entries()).map(([range, count]) => ({
+      range,
+      count,
+    }));
+
+    // Count late submissions
+    let lateSubmissions = 0;
+    if (assignment.dueDateAt) {
+      for (const submission of submissions) {
+        if (submission.submittedAt > assignment.dueDateAt) {
+          lateSubmissions++;
+        }
+      }
+    }
+
+    // Get list of students who haven't submitted
+    const submittedStudentIds = new Set(submissions.map((s) => s.studentId));
+    const notSubmitted = studentIds.filter((id) => !submittedStudentIds.has(id));
+
+    return {
+      totalStudents,
+      submittedCount,
+      submissionRate,
+      averageScore,
+      gradeDistribution,
+      lateSubmissions,
+      notSubmitted,
+    };
+  },
+});
+
+export const getOverdueAssignments = query({
+  args: {
+    classId: v.id("classes"),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("assignments"),
+      title: v.string(),
+      dueDateAt: v.number(),
+      submissionCount: v.number(),
+      missingCount: v.number(),
+      daysOverdue: v.number(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const cls = await ctx.db.get(args.classId);
+    if (!cls) {
+      throw new Error("Class not found");
+    }
+
+    if (cls.teacherId !== user._id) {
+      throw new Error("Only the teacher can view overdue assignments");
+    }
+
+    const now = Date.now();
+
+    // Get all enrolled students
+    const enrollments = await ctx.db
+      .query("enrollments")
+      .withIndex("by_class", (q) => q.eq("classId", args.classId))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+
+    const totalStudents = enrollments.length;
+
+    // Get all published assignments with due dates that have passed
+    const assignments = await ctx.db
+      .query("assignments")
+      .withIndex("by_class", (q) => q.eq("classId", args.classId))
+      .filter((q) => q.eq(q.field("isPublished"), true))
+      .filter((q) => q.and(
+        q.neq(q.field("dueDateAt"), undefined),
+        q.lt(q.field("dueDateAt"), now)
+      ))
+      .collect();
+
+    const overdueAssignments: {
+      _id: Id<"assignments">;
+      title: string;
+      dueDateAt: number;
+      submissionCount: number;
+      missingCount: number;
+      daysOverdue: number;
+    }[] = [];
+
+    for (const assignment of assignments) {
+      if (!assignment.dueDateAt) continue;
+
+      const submissions = await ctx.db
+        .query("submissions")
+        .withIndex("by_assignment", (q) => q.eq("assignmentId", assignment._id))
+        .collect();
+
+      const submissionCount = submissions.length;
+      const missingCount = totalStudents - submissionCount;
+      const daysOverdue = Math.floor((now - assignment.dueDateAt) / (1000 * 60 * 60 * 24));
+
+      overdueAssignments.push({
+        _id: assignment._id,
+        title: assignment.title,
+        dueDateAt: assignment.dueDateAt,
+        submissionCount,
+        missingCount,
+        daysOverdue,
+      });
+    }
+
+    // Sort by most overdue first
+    overdueAssignments.sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+    return overdueAssignments;
+  },
+});
+
+export const getAssignmentAnalytics = query({
+  args: {
+    classId: v.id("classes"),
+  },
+  returns: v.object({
+    totalAssignments: v.number(),
+    publishedCount: v.number(),
+    unpublishedCount: v.number(),
+    averageSubmissionRate: v.optional(v.number()),
+    averageGrades: v.array(v.object({
+      assignmentId: v.id("assignments"),
+      title: v.string(),
+      averageScore: v.optional(v.number()),
+    })),
+    upcomingDeadlines: v.array(v.object({
+      _id: v.id("assignments"),
+      title: v.string(),
+      dueDateAt: v.number(),
+      daysUntilDue: v.number(),
+    })),
+    overdueAssignmentsCount: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const cls = await ctx.db.get(args.classId);
+    if (!cls) {
+      throw new Error("Class not found");
+    }
+
+    if (cls.teacherId !== user._id) {
+      throw new Error("Only the teacher can view assignment analytics");
+    }
+
+    const now = Date.now();
+    const sevenDaysFromNow = now + 7 * 24 * 60 * 60 * 1000;
+
+    // Get all assignments
+    const assignments = await ctx.db
+      .query("assignments")
+      .withIndex("by_class", (q) => q.eq("classId", args.classId))
+      .collect();
+
+    const totalAssignments = assignments.length;
+    const publishedCount = assignments.filter((a) => a.isPublished).length;
+    const unpublishedCount = totalAssignments - publishedCount;
+
+    // Get all enrolled students
+    const enrollments = await ctx.db
+      .query("enrollments")
+      .withIndex("by_class", (q) => q.eq("classId", args.classId))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+
+    const totalStudents = enrollments.length;
+
+    // Calculate submission rates and grades per assignment
+    let totalSubmissionRate = 0;
+    let gradedAssignmentsCount = 0;
+    const averageGrades: {
+      assignmentId: Id<"assignments">;
+      title: string;
+      averageScore?: number;
+    }[] = [];
+
+    for (const assignment of assignments) {
+      if (!assignment.isPublished) continue;
+
+      const submissions = await ctx.db
+        .query("submissions")
+        .withIndex("by_assignment", (q) => q.eq("assignmentId", assignment._id))
+        .collect();
+
+      if (totalStudents > 0) {
+        totalSubmissionRate += (submissions.length / totalStudents) * 100;
+      }
+
+      const grades = await ctx.db
+        .query("grades")
+        .withIndex("by_assignment", (q) => q.eq("assignmentId", assignment._id))
+        .collect();
+
+      if (grades.length > 0) {
+        const totalScore = grades.reduce((sum, g) => sum + (g.score / g.maxScore) * 100, 0);
+        averageGrades.push({
+          assignmentId: assignment._id,
+          title: assignment.title,
+          averageScore: totalScore / grades.length,
+        });
+        gradedAssignmentsCount++;
+      } else {
+        averageGrades.push({
+          assignmentId: assignment._id,
+          title: assignment.title,
+        });
+      }
+    }
+
+    const averageSubmissionRate = totalAssignments > 0
+      ? totalSubmissionRate / publishedCount
+      : undefined;
+
+    // Get upcoming deadlines (next 7 days)
+    const upcomingDeadlines: {
+      _id: Id<"assignments">;
+      title: string;
+      dueDateAt: number;
+      daysUntilDue: number;
+    }[] = [];
+
+    for (const assignment of assignments) {
+      if (assignment.dueDateAt && assignment.dueDateAt >= now && assignment.dueDateAt <= sevenDaysFromNow) {
+        upcomingDeadlines.push({
+          _id: assignment._id,
+          title: assignment.title,
+          dueDateAt: assignment.dueDateAt,
+          daysUntilDue: Math.ceil((assignment.dueDateAt - now) / (1000 * 60 * 60 * 24)),
+        });
+      }
+    }
+
+    // Sort upcoming deadlines by due date
+    upcomingDeadlines.sort((a, b) => a.dueDateAt - b.dueDateAt);
+
+    // Count overdue assignments
+    const overdueAssignmentsCount = assignments.filter(
+      (a) => a.isPublished && a.dueDateAt && a.dueDateAt < now
+    ).length;
+
+    return {
+      totalAssignments,
+      publishedCount,
+      unpublishedCount,
+      averageSubmissionRate,
+      averageGrades,
+      upcomingDeadlines,
+      overdueAssignmentsCount,
+    };
+  },
+});
+
+export const getStudentAssignmentStatus = query({
+  args: {
+    studentId: v.id("users"),
+    classId: v.id("classes"),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("assignments"),
+      title: v.string(),
+      instructions: v.string(),
+      dueDateAt: v.optional(v.number()),
+      status: v.union(v.literal("not_started"), v.literal("submitted"), v.literal("graded")),
+      submittedAt: v.optional(v.number()),
+      grade: v.optional(v.object({
+        score: v.number(),
+        maxScore: v.number(),
+        feedback: v.optional(v.string()),
+      })),
+      isLate: v.boolean(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const cls = await ctx.db.get(args.classId);
+    if (!cls) {
+      throw new Error("Class not found");
+    }
+
+    // Only teachers can view other students' status
+    if (cls.teacherId !== user._id && user._id !== args.studentId) {
+      throw new Error("Not authorized to view this student's assignment status");
+    }
+
+    // Verify student is enrolled
+    const enrollment = await ctx.db
+      .query("enrollments")
+      .withIndex("by_class_and_student", (q) =>
+        q.eq("classId", args.classId).eq("studentId", args.studentId)
+      )
+      .unique();
+
+    if (!enrollment || enrollment.status !== "active") {
+      throw new Error("Student is not enrolled in this class");
+    }
+
+    const now = Date.now();
+
+    // Get all published assignments for this class
+    const assignments = await ctx.db
+      .query("assignments")
+      .withIndex("by_class", (q) => q.eq("classId", args.classId))
+      .filter((q) => q.eq(q.field("isPublished"), true))
+      .collect();
+
+    const assignmentStatuses: {
+      _id: Id<"assignments">;
+      title: string;
+      instructions: string;
+      dueDateAt: number | undefined;
+      status: "not_started" | "submitted" | "graded";
+      submittedAt: number | undefined;
+      grade: {
+        score: number;
+        maxScore: number;
+        feedback?: string;
+      } | undefined;
+      isLate: boolean;
+    }[] = [];
+
+    for (const assignment of assignments) {
+      // Check for submission
+      const submission = await ctx.db
+        .query("submissions")
+        .withIndex("by_assignment_and_student", (q) =>
+          q.eq("assignmentId", assignment._id).eq("studentId", args.studentId)
+        )
+        .unique();
+
+      // Check for grade
+      const grade = await ctx.db
+        .query("grades")
+        .withIndex("by_assignment_and_student", (q) =>
+          q.eq("assignmentId", assignment._id).eq("studentId", args.studentId)
+        )
+        .unique();
+
+      // Determine status
+      let status: "not_started" | "submitted" | "graded" = "not_started";
+      if (grade) {
+        status = "graded";
+      } else if (submission) {
+        status = "submitted";
+      }
+
+      // Check if late
+      let isLate = false;
+      if (submission && assignment.dueDateAt) {
+        isLate = submission.submittedAt > assignment.dueDateAt;
+      }
+
+      assignmentStatuses.push({
+        _id: assignment._id,
+        title: assignment.title,
+        instructions: assignment.instructions,
+        dueDateAt: assignment.dueDateAt,
+        status,
+        submittedAt: submission?.submittedAt,
+        grade: grade
+          ? {
+              score: grade.score,
+              maxScore: grade.maxScore,
+              feedback: grade.feedback,
+            }
+          : undefined,
+        isLate,
+      });
+    }
+
+    // Sort by due date (assignments without due date last), then by status
+    assignmentStatuses.sort((a, b) => {
+      if (a.dueDateAt && b.dueDateAt) {
+        return a.dueDateAt - b.dueDateAt;
+      }
+      if (a.dueDateAt) return -1;
+      if (b.dueDateAt) return 1;
+      return 0;
+    });
+
+    return assignmentStatuses;
+  },
+});

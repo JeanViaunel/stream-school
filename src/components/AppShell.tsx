@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { GradeSkin } from "@/components/ui/GradeSkin";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
+import { PageTransition, RouteProgressBar } from "@/components/transitions/PageTransitions";
 
 function AppLoadingScreen() {
   return (
@@ -54,6 +55,7 @@ function AppContent({ children }: { children: ReactNode }) {
   
   return (
     <GradeSkin className="flex h-full min-h-0 w-full flex-col">
+      <RouteProgressBar />
       <CommandPalette />
       <IncomingCallModal />
       <NotificationManager />
@@ -61,7 +63,11 @@ function AppContent({ children }: { children: ReactNode }) {
         <div className="hidden md:block">
           <Sidebar />
         </div>
-        <main className="flex-1 overflow-auto pb-16 md:pb-0">{children}</main>
+        <main className="flex-1 overflow-auto pb-16 md:pb-0">
+          <PageTransition>
+            {children}
+          </PageTransition>
+        </main>
       </div>
       <MobileNav />
     </GradeSkin>

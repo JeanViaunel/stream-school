@@ -19,6 +19,11 @@ export default defineSchema({
     gradeLevel: v.optional(v.number()),
     avatarUrl: v.optional(v.string()),
     bio: v.optional(v.string()),
+    subjectExpertise: v.optional(v.array(v.string())),
+    yearsOfExperience: v.optional(v.number()),
+    teacherBio: v.optional(v.string()),
+    certifications: v.optional(v.array(v.string())),
+    specializations: v.optional(v.array(v.string())),
     parentConsentGiven: v.optional(v.boolean()),
     parentConsentAt: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
@@ -208,7 +213,9 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_class", ["classId"])
-    .index("by_class_and_scheduled_at", ["classId", "scheduledAt"]),
+    .index("by_class_and_scheduled_at", ["classId", "scheduledAt"])
+    .index("by_teacher", ["teacherId"])
+    .index("by_teacher_and_scheduled_at", ["teacherId", "scheduledAt"]),
 
   meetings: defineTable({
     organizationId: v.id("organizations"),
