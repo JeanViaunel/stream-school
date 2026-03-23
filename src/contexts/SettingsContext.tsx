@@ -25,7 +25,36 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
 
-  // Apply CSS side-effects for compact mode and animations on mount and change
+  // Apply CSS side-effects for theme, compact mode and animations on mount and change
+  useEffect(() => {
+    const html = document.documentElement;
+    
+    // Theme handling
+    const applyTheme = () => {
+      html.classList.remove("light", "dark");
+      
+      if (settings.theme === "system") {
+        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        html.classList.add(systemTheme);
+      } else {
+        html.classList.add(settings.theme);
+      }
+    };
+    
+    applyTheme();
+    
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => {
+      if (settings.theme === "system") {
+        applyTheme();
+      }
+    };
+    
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [settings.theme]);
+
   useEffect(() => {
     const html = document.documentElement;
     if (settings.compactMode) {

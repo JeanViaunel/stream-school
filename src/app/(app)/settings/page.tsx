@@ -22,8 +22,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { type AppSettings } from "@/lib/settings";
+import { type AppSettings, type Theme } from "@/lib/settings";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Sun, Moon, Monitor } from "lucide-react";
 
 interface SettingItem {
   id: keyof AppSettings;
@@ -35,6 +43,12 @@ interface SettingGroup {
   title: string;
   items: SettingItem[];
 }
+
+const THEME_OPTIONS: { value: Theme; label: string; icon: React.ElementType }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+];
 
 const SETTING_GROUPS: SettingGroup[] = [
   {
@@ -173,6 +187,44 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-8">
+          {/* Theme Selector - Special Section */}
+          <div>
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Theme
+            </h2>
+            <div className="rounded-xl border border-border/50 bg-card/40 overflow-hidden px-4 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0 pr-6">
+                  <p className="text-sm font-medium">Appearance</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Choose your preferred color scheme
+                  </p>
+                </div>
+                <Select
+                  value={settings.theme}
+                  onValueChange={(v) => {
+                    updateSetting("theme", v as Theme);
+                    toast.success(`Theme changed to ${v}`);
+                  }}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {THEME_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <div className="flex items-center gap-2">
+                          <option.icon className="h-4 w-4" />
+                          {option.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
           {SETTING_GROUPS.map((group) => (
             <div key={group.title}>
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">

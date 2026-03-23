@@ -1,3 +1,5 @@
+export type Theme = "light" | "dark" | "system";
+
 export interface AppSettings {
   desktopNotifications: boolean;
   messagePreview: boolean;
@@ -7,6 +9,7 @@ export interface AppSettings {
   typingIndicators: boolean;
   compactMode: boolean;
   animations: boolean;
+  theme: Theme;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -18,6 +21,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   typingIndicators: true,
   compactMode: false,
   animations: true,
+  theme: "system",
 };
 
 const STORAGE_KEY = "appSettings";
