@@ -388,7 +388,7 @@ export function CallLobby({
                 </label>
                 <Select
                   value={selectedDevice}
-                  onValueChange={(value) => setSelectedDevice(value)}
+                  onValueChange={(value) => value && setSelectedDevice(value)}
                 >
                   <SelectTrigger className="bg-white/5 border-white/10 text-white hover:bg-white/10">
                     <SelectValue placeholder="Select camera" />
@@ -420,7 +420,7 @@ export function CallLobby({
                 </label>
                 <Select
                   value={selectedMicDevice}
-                  onValueChange={(value) => setSelectedMicDevice(value)}
+                  onValueChange={(value) => value && setSelectedMicDevice(value)}
                 >
                   <SelectTrigger className="bg-white/5 border-white/10 text-white hover:bg-white/10">
                     <SelectValue placeholder="Select microphone" />

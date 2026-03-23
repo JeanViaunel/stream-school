@@ -62,7 +62,7 @@ export function CommandPalette() {
 
   const handleChannelSelect = (channel: any) => {
     setActiveChannel(channel)
-    router.push(`/messages/${channel.id}`)
+    router.push(`/dashboard`)
     setOpen(false)
   }
 

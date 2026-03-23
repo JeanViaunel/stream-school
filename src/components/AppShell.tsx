@@ -8,6 +8,7 @@ import { GradeSkinProvider } from "@/contexts/GradeSkinContext";
 import { StreamContext } from "@/contexts/StreamContext";
 import { UIActionsProvider } from "@/contexts/UIActionsContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
+import { Sidebar } from "@/components/chat/Sidebar";
 import { IncomingCallModal } from "@/components/call/IncomingCallModal";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NotificationManager } from "@/components/NotificationManager";
@@ -66,7 +67,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               <CommandPalette />
               <IncomingCallModal />
               <NotificationManager />
-              {children}
+              <div className="flex h-screen">
+                <Sidebar />
+                <main className="flex-1 overflow-auto">
+                  {children}
+                </main>
+              </div>
             </StreamContext>
           </GradeSkinProvider>
         </OrgProvider>

@@ -129,15 +129,15 @@ export default function CallPage({ params }: CallPageProps) {
 
   const handleLeave = useCallback(() => {
     leftRef.current = true;
-    router.replace("/messages");
+    router.replace("/dashboard");
   }, [router]);
 
   if (error) {
     return (
       <div className="flex h-screen items-center justify-center flex-col gap-4">
         <p className="text-destructive">{error}</p>
-        <button onClick={() => router.replace("/messages")} className="underline">
-          Back to messages
+        <button onClick={() => router.replace("/dashboard")} className="underline">
+          Back to dashboard
         </button>
       </div>
     );

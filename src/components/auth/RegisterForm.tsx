@@ -49,7 +49,7 @@ export function RegisterForm() {
   const { session, login } = useAuth();
 
   useEffect(() => {
-    if (session) router.replace("/messages");
+    if (session) router.replace("/dashboard");
   }, [session, router]);
 
   const registerAction = useAction(api.auth.register);

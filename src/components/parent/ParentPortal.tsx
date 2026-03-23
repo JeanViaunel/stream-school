@@ -207,7 +207,7 @@ export function ParentPortal({ linkedChildren, onLinkChild }: ParentPortalProps)
                         {cls.teacherName}
                       </div>
                     </div>
-                    <Link href={`/messages`}>
+                    <Link href={`/dashboard`}>
                       <Button variant="ghost" size="sm">
                         <MessageCircle className="w-4 h-4" />
                       </Button>

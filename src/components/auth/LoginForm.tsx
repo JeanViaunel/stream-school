@@ -19,7 +19,7 @@ export function LoginForm() {
   const { session, login } = useAuth();
 
   useEffect(() => {
-    if (session) router.replace("/messages");
+    if (session) router.replace("/dashboard");
   }, [session, router]);
 
   const loginAction = useAction(api.auth.login);
@@ -70,7 +70,7 @@ export function LoginForm() {
       
       // Small delay for success animation
       setTimeout(() => {
-        router.replace("/messages");
+        router.replace("/dashboard");
       }, 500);
       
     } catch (err) {
