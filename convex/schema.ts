@@ -95,6 +95,8 @@ export default defineSchema({
     endedAt: v.optional(v.number()),
     recordingUrl: v.optional(v.string()),
     recordingConsentRequired: v.boolean(),
+    recordingStartedAt: v.optional(v.number()),
+    recordingEndedAt: v.optional(v.number()),
   })
     .index("by_class", ["classId"])
     .index("by_class_and_started_at", ["classId", "startedAt"])
@@ -139,8 +141,10 @@ export default defineSchema({
     })),
     submittedAt: v.number(),
     autoScore: v.optional(v.number()),
+    autoGradedAt: v.optional(v.number()),
     teacherScore: v.optional(v.number()),
     teacherFeedback: v.optional(v.string()),
+    isTeacherOverride: v.optional(v.boolean()),
   })
     .index("by_assignment", ["assignmentId"])
     .index("by_student", ["studentId"])
@@ -273,4 +277,53 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_read", ["userId", "read"])
     .index("by_user_created", ["userId", "createdAt"]),
+
+  assignmentAttachments: defineTable({
+    assignmentId: v.id("assignments"),
+    filename: v.string(),
+    url: v.string(),
+    size: v.number(),
+    mimeType: v.string(),
+    uploadedAt: v.number(),
+  }).index("by_assignment", ["assignmentId"]),
+
+  submissionAttachments: defineTable({
+    submissionId: v.id("submissions"),
+    filename: v.string(),
+    url: v.string(),
+    size: v.number(),
+    mimeType: v.string(),
+    uploadedAt: v.number(),
+  }).index("by_submission", ["submissionId"]),
+
+  studentProgress: defineTable({
+    studentId: v.id("users"),
+    classId: v.id("classes"),
+    overallProgress: v.number(), // 0-100
+    assignmentProgress: v.number(),
+    sessionAttendanceProgress: v.number(),
+    lastUpdated: v.number(),
+  })
+    .index("by_student_and_class", ["studentId", "classId"])
+    .index("by_class", ["classId"]),
+
+  milestones: defineTable({
+    classId: v.id("classes"),
+    name: v.string(),
+    description: v.string(),
+    type: v.union(v.literal("assignment_count"), v.literal("attendance_streak"), v.literal("grade_average")),
+    targetValue: v.number(),
+    order: v.number(),
+  })
+    .index("by_class", ["classId"])
+    .index("by_class_and_order", ["classId", "order"]),
+
+  completedMilestones: defineTable({
+    milestoneId: v.id("milestones"),
+    studentId: v.id("users"),
+    completedAt: v.number(),
+  })
+    .index("by_student", ["studentId"])
+    .index("by_milestone", ["milestoneId"])
+    .index("by_student_and_milestone", ["studentId", "milestoneId"]),
 });

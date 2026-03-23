@@ -8,14 +8,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Trash2, CalendarIcon, Save, Send } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { 
+  Plus, 
+  Trash2, 
+  CalendarIcon, 
+  Save, 
+  Send, 
+  HelpCircle, 
+  CheckCircle2, 
+  AlertCircle,
+  FileText,
+  Clock,
+  ListTodo,
+  AlignLeft,
+  GripVertical,
+  X
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Question {
   id: string;
@@ -39,6 +58,7 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
   ]);
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeQuestion, setActiveQuestion] = useState<string | null>(null);
 
   const createAssignment = useMutation(api.assignments.createAssignment);
   const publishAssignment = useMutation(api.assignments.publishAssignment);
@@ -48,11 +68,15 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
       ? { id: crypto.randomUUID(), text: "", options: ["", ""], correctOption: 0 }
       : { id: crypto.randomUUID(), text: "" };
     setQuestions([...questions, newQuestion]);
+    setActiveQuestion(newQuestion.id);
   };
 
   const removeQuestion = (questionId: string) => {
     if (questions.length <= 1) return;
     setQuestions(questions.filter(q => q.id !== questionId));
+    if (activeQuestion === questionId) {
+      setActiveQuestion(null);
+    }
   };
 
   const updateQuestionText = (questionId: string, text: string) => {
@@ -114,6 +138,23 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
     return true;
   };
 
+  const getValidationErrors = () => {
+    const errors: string[] = [];
+    if (!title.trim()) errors.push("Assignment title is required");
+    questions.forEach((q, idx) => {
+      if (!q.text.trim()) errors.push(`Question ${idx + 1} text is required`);
+      if (type === "multiple_choice" && q.options) {
+        if (q.options.some(opt => !opt.trim())) {
+          errors.push(`Question ${idx + 1} has empty options`);
+        }
+        if (q.correctOption === undefined) {
+          errors.push(`Question ${idx + 1} needs a correct answer selected`);
+        }
+      }
+    });
+    return errors;
+  };
+
   const handleSaveDraft = async () => {
     if (!validateForm()) return;
     
@@ -170,180 +211,391 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
     }
   };
 
+  const completionPercentage = Math.round(
+    (questions.filter(q => q.text.trim() && (type === "short_answer" || (q.options?.every(opt => opt.trim()) && q.correctOption !== undefined))).length / Math.max(questions.length, 1)) * 100
+  );
+
   return (
-    <Card className="w-full max-w-2xl">
-      <CardHeader>
-        <CardTitle>Create New Assignment</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="title">Title</Label>
-          <Input
-            id="title"
-            placeholder="Enter assignment title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="instructions">Instructions</Label>
-          <Textarea
-            id="instructions"
-            placeholder="Enter instructions for students"
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
-            rows={3}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="type">Assignment Type</Label>
-          <Select value={type} onValueChange={(v) => {
-            setType(v as "multiple_choice" | "short_answer");
-            setQuestions([{ 
-              id: crypto.randomUUID(), 
-              text: "", 
-              options: v === "multiple_choice" ? ["", ""] : undefined 
-            }]);
-          }}>
-            <SelectTrigger id="type">
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
-              <SelectItem value="short_answer">Short Answer</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Due Date (Optional)</Label>
-          <Popover>
-            <PopoverTrigger
-              render={
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !dueDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dueDate ? format(dueDate, "PPP") : "Pick a date"}
-                </Button>
-              }
-            />
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={dueDate}
-                onSelect={setDueDate}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        <div className="space-y-4">
+    <TooltipProvider>
+      <div className="flex h-full min-h-0 flex-col w-full">
+        {/* Header Section */}
+        <div className="mb-6 space-y-2">
           <div className="flex items-center justify-between">
-            <Label>Questions</Label>
-            <Button variant="outline" size="sm" onClick={addQuestion}>
-              <Plus className="mr-1 h-4 w-4" />
-              Add Question
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FileText className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold">Create Assignment</h2>
+                <p className="text-sm text-muted-foreground">
+                  {questions.length} question{questions.length !== 1 ? 's' : ''} • {completionPercentage}% complete
+                </p>
+              </div>
+            </div>
+            {completionPercentage === 100 && (
+              <Badge variant="default" className="bg-green-500">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Ready
+              </Badge>
+            )}
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <div 
+              className={cn(
+                "h-full transition-all duration-300 rounded-full",
+                completionPercentage === 100 ? "bg-green-500" : "bg-primary"
+              )}
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Main Form */}
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1 space-y-6">
+          {/* Assignment Details Card */}
+          <Card className="border-border/50 shadow-sm">
+            <CardContent className="p-6 space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-base font-medium flex items-center gap-2">
+                  Assignment Title
+                  <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="title"
+                  placeholder="e.g., Midterm Exam - Chapter 1-5"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className={cn(
+                    "h-11",
+                    !title.trim() && questions.some(q => q.text) && "border-destructive focus-visible:ring-destructive"
+                  )}
+                />
+                {!title.trim() && questions.some(q => q.text) && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Title is required
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="instructions" className="text-base font-medium flex items-center gap-2">
+                  <AlignLeft className="h-4 w-4 text-muted-foreground" />
+                  Instructions
+                  <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+                </Label>
+                <Textarea
+                  id="instructions"
+                  placeholder="Provide detailed instructions for students..."
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-base font-medium flex items-center gap-2">
+                    <ListTodo className="h-4 w-4 text-muted-foreground" />
+                    Question Type
+                  </Label>
+                  <Select value={type} onValueChange={(v) => {
+                    setType(v as "multiple_choice" | "short_answer");
+                    setQuestions([{ 
+                      id: crypto.randomUUID(), 
+                      text: "", 
+                      options: v === "multiple_choice" ? ["", ""] : undefined 
+                    }]);
+                  }}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="multiple_choice">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded-full border-2 border-primary flex items-center justify-center">
+                            <div className="w-2 h-2 rounded-full bg-primary" />
+                          </div>
+                          Multiple Choice
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="short_answer">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-primary rounded" />
+                          Short Answer
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-base font-medium flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    Due Date
+                    <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal h-11",
+                          !dueDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dueDate ? format(dueDate, "PPP") : "No due date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dueDate}
+                        onSelect={setDueDate}
+                        initialFocus
+                        disabled={(date) => date < new Date()}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Separator />
+
+          {/* Questions Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold">Questions</h3>
+                <Badge variant="secondary">{questions.length}</Badge>
+              </div>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button variant="outline" size="sm" onClick={addQuestion} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add Question
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Add a new {type === "multiple_choice" ? "multiple choice" : "short answer"} question</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <AnimatePresence mode="popLayout">
+              {questions.map((question, qIndex) => (
+                <motion.div
+                  key={question.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Card 
+                    className={cn(
+                      "border-border/50 shadow-sm transition-all duration-200",
+                      activeQuestion === question.id && "ring-2 ring-primary/20 border-primary/50"
+                    )}
+                    onClick={() => setActiveQuestion(question.id)}
+                  >
+                    <CardContent className="p-6">
+                      <div className="space-y-5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                              {qIndex + 1}
+                            </div>
+                            <p className="text-sm font-medium text-muted-foreground">Question {qIndex + 1}</p>
+                            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                          </div>
+                          {questions.length > 1 && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                                  onClick={() => removeQuestion(question.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Remove question</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+
+                        {/* Question Text */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-muted-foreground">
+                            Question Text
+                          </Label>
+                          <Textarea
+                            placeholder="Enter your question here..."
+                            value={question.text}
+                            onChange={(e) => updateQuestionText(question.id, e.target.value)}
+                            rows={2}
+                            className={cn(
+                              "resize-none",
+                              !question.text.trim() && "border-destructive focus-visible:ring-destructive"
+                            )}
+                          />
+                        </div>
+                          
+                        {/* Multiple Choice Options */}
+                        {type === "multiple_choice" && question.options && (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <HelpCircle className="h-4 w-4" />
+                              <span>Select the correct answer</span>
+                            </div>
+                              
+                            <RadioGroup
+                              value={question.correctOption?.toString()}
+                              onValueChange={(v) => setCorrectOption(question.id, parseInt(v))}
+                              className="grid grid-cols-1 lg:grid-cols-2 gap-2"
+                            >
+                              <AnimatePresence>
+                                {question.options.map((option, oIndex) => (
+                                  <motion.div
+                                    key={oIndex}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: 10 }}
+                                    className={cn(
+                                      "flex items-center gap-3 p-3 rounded-lg border transition-all",
+                                      question.correctOption === oIndex
+                                        ? "border-green-500 bg-green-50 dark:bg-green-950/20"
+                                        : "border-border hover:border-primary/50"
+                                    )}
+                                  >
+                                    <RadioGroupItem
+                                      value={oIndex.toString()}
+                                      id={`${question.id}-option-${oIndex}`}
+                                      className="data-[state=checked]:border-green-500 data-[state=checked]:text-green-500"
+                                    />
+                                    <Input
+                                      placeholder={`Option ${oIndex + 1}`}
+                                      value={option}
+                                      onChange={(e) => updateOption(question.id, oIndex, e.target.value)}
+                                      className={cn(
+                                        "flex-1 border-0 bg-transparent focus-visible:ring-0 px-0",
+                                        !option.trim() && "placeholder:text-destructive/60"
+                                      )}
+                                    />
+                                    {question.options!.length > 2 && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 shrink-0"
+                                            onClick={() => removeOption(question.id, oIndex)}
+                                          >
+                                            <X className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Remove option</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                  </motion.div>
+                                ))}
+                              </AnimatePresence>
+                            </RadioGroup>
+                              
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => addOption(question.id)}
+                              className="text-muted-foreground hover:text-primary"
+                            >
+                              <Plus className="mr-1 h-4 w-4" />
+                              Add Option
+                            </Button>
+                          </div>
+                        )}
+                          
+                        {/* Short Answer Preview */}
+                        {type === "short_answer" && (
+                          <div>
+                            <div className="p-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30">
+                              <p className="text-sm text-muted-foreground">
+                                Students will provide a text response
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {/* Add Question Button */}
+            <Button 
+              variant="outline" 
+              className="w-full py-6 border-dashed hover:border-primary hover:bg-primary/5"
+              onClick={addQuestion}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Another Question
             </Button>
           </div>
 
-          <div className="space-y-4">
-            {questions.map((question, qIndex) => (
-              <Card key={question.id} className="border-muted">
-                <CardContent className="pt-4 space-y-4">
-                  <div className="flex items-start gap-2">
-                    <span className="text-sm font-medium text-muted-foreground mt-2">
-                      {qIndex + 1}.
-                    </span>
-                    <div className="flex-1 space-y-2">
-                      <Input
-                        placeholder="Enter question text"
-                        value={question.text}
-                        onChange={(e) => updateQuestionText(question.id, e.target.value)}
-                      />
-                      
-                      {type === "multiple_choice" && question.options && (
-                        <div className="space-y-2 pl-4">
-                          <RadioGroup
-                            value={question.correctOption?.toString()}
-                            onValueChange={(v) => setCorrectOption(question.id, parseInt(v))}
-                          >
-                            {question.options.map((option, oIndex) => (
-                              <div key={oIndex} className="flex items-center gap-2">
-                                <RadioGroupItem
-                                  value={oIndex.toString()}
-                                  id={`${question.id}-option-${oIndex}`}
-                                />
-                                <Input
-                                  placeholder={`Option ${oIndex + 1}`}
-                                  value={option}
-                                  onChange={(e) => updateOption(question.id, oIndex, e.target.value)}
-                                  className="flex-1"
-                                />
-                                {question.options!.length > 2 && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => removeOption(question.id, oIndex)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                )}
-                              </div>
-                            ))}
-                          </RadioGroup>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => addOption(question.id)}
-                            className="text-muted-foreground"
-                          >
-                            <Plus className="mr-1 h-3 w-3" />
-                            Add Option
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                    {questions.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeQuestion(question.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {/* Validation Errors */}
+          {getValidationErrors().length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="p-4 rounded-lg bg-destructive/10 border border-destructive/20"
+            >
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-medium text-destructive">Please fix the following:</p>
+                  <ul className="text-sm text-destructive/80 space-y-1">
+                    {getValidationErrors().map((error, idx) => (
+                      <li key={idx}>• {error}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </motion.div>
+          )}
         </div>
-      </CardContent>
-      <CardFooter className="flex justify-end gap-2">
-        <Button
-          variant="outline"
-          onClick={handleSaveDraft}
-          disabled={!validateForm() || isSubmitting}
-        >
-          <Save className="mr-2 h-4 w-4" />
-          Save Draft
-        </Button>
-        <Button
-          onClick={handlePublish}
-          disabled={!validateForm() || isSubmitting}
-        >
-          <Send className="mr-2 h-4 w-4" />
-          Publish
-        </Button>
-      </CardFooter>
-    </Card>
+
+        {/* Footer Actions */}
+        <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t bg-background/95 supports-backdrop-filter:backdrop-blur">
+          <Button
+            variant="outline"
+            onClick={handleSaveDraft}
+            disabled={!validateForm() || isSubmitting}
+            className="gap-2"
+          >
+            <Save className="h-4 w-4" />
+            {isSubmitting ? "Saving..." : "Save as Draft"}
+          </Button>
+          <Button
+            onClick={handlePublish}
+            disabled={!validateForm() || isSubmitting}
+            className="gap-2"
+          >
+            <Send className="h-4 w-4" />
+            {isSubmitting ? "Publishing..." : "Publish Assignment"}
+          </Button>
+        </div>
+      </div>
+    </TooltipProvider>
   );
 }

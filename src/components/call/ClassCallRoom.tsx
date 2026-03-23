@@ -332,7 +332,7 @@ export function ClassCallRoom({
   useEffect(() => {
     if (!call || isTeacher) return;
 
-    const myStreamUserId = client?.user?.id;
+    const myStreamUserId = session?.streamUserId;
 
     const markJoined = async (streamUserId: string) => {
       try {

@@ -33,6 +33,7 @@ import type * as polls from "../polls.js";
 import type * as privacy from "../privacy.js";
 import type * as privacyQueries from "../privacyQueries.js";
 import type * as recordings from "../recordings.js";
+import type * as s3 from "../s3.js";
 import type * as schedule from "../schedule.js";
 import type * as sessions from "../sessions.js";
 import type * as stream from "../stream.js";
@@ -72,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   privacy: typeof privacy;
   privacyQueries: typeof privacyQueries;
   recordings: typeof recordings;
+  s3: typeof s3;
   schedule: typeof schedule;
   sessions: typeof sessions;
   stream: typeof stream;

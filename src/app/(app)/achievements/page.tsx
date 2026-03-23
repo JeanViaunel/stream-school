@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useQuery } from "convex/react";
@@ -104,10 +104,11 @@ const BADGES: Badge[] = [
   },
 ];
 
-export function AchievementBadges() {
+export default function AchievementsPage() {
   const { session } = useAuth();
   const analytics = useQuery(api.analytics.getStudentAnalytics);
   const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
+  const [now] = useState(() => Date.now());
 
   if (!session) return null;
 
@@ -120,12 +121,12 @@ export function AchievementBadges() {
       case "first_class":
         if (analytics && analytics.totalClasses > 0) {
           progress = 1;
-          earnedAt = Date.now();
+          earnedAt = now;
         }
         break;
       case "assignment_pro":
         progress = analytics?.completedAssignments || 0;
-        if (progress >= 10) earnedAt = Date.now();
+        if (progress >= 10) earnedAt = now;
         break;
       case "perfect_score":
         // Would need to check for 100% grades
@@ -133,16 +134,16 @@ export function AchievementBadges() {
         break;
       case "streak_master":
         progress = analytics?.currentStreak || 0;
-        if (progress >= 7) earnedAt = Date.now();
+        if (progress >= 7) earnedAt = now;
         break;
       case "scholar":
         progress = analytics?.totalSessionsAttended || 0;
-        if (progress >= 20) earnedAt = Date.now();
+        if (progress >= 20) earnedAt = now;
         break;
       case "top_student":
         if (analytics?.averageGrade && analytics.averageGrade >= 90) {
           progress = 1;
-          earnedAt = Date.now();
+          earnedAt = now;
         }
         break;
       case "consistent":
@@ -152,7 +153,7 @@ export function AchievementBadges() {
       case "master":
         const earnedCount = BADGES.filter(b => b.id !== "master" && b.earnedAt).length;
         progress = earnedCount;
-        if (progress >= 5) earnedAt = Date.now();
+        if (progress >= 5) earnedAt = now;
         break;
     }
 

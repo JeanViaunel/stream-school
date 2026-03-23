@@ -137,7 +137,7 @@ export function CreateClassModal({ open, onOpenChange }: Props) {
               <Select
                 value={formData.teacherId}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, teacherId: value })
+                  value && setFormData({ ...formData, teacherId: value })
                 }
                 disabled={
                   isLoading ||

@@ -1,7 +1,8 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, action } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { usernameFromIdentity } from "./authHelpers";
+import { api } from "./_generated/api";
 
 export const createAssignment = mutation({
   args: {
@@ -1030,5 +1031,461 @@ export const getStudentAssignmentStatus = query({
     });
 
     return assignmentStatuses;
+  },
+});
+
+// File Upload Functions
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+];
+
+function isValidMimeType(mimeType: string): boolean {
+  return ALLOWED_MIME_TYPES.includes(mimeType);
+}
+
+export const uploadAssignmentAttachment = action({
+  args: {
+    assignmentId: v.id("assignments"),
+    filename: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+  },
+  returns: v.object({
+    uploadUrl: v.string(),
+    fileUrl: v.string(),
+    attachmentId: v.id("assignmentAttachments"),
+  }),
+  handler: async (ctx, args): Promise<{ uploadUrl: string; fileUrl: string; attachmentId: Id<"assignmentAttachments"> }> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.runQuery(api.users.getUserByUsername, {
+      username: usernameFromIdentity(identity),
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Validate file size
+    if (args.size > MAX_FILE_SIZE) {
+      throw new Error(`File size exceeds maximum allowed size of 50MB`);
+    }
+
+    // Validate mime type
+    if (!isValidMimeType(args.contentType)) {
+      throw new Error(`File type ${args.contentType} is not allowed. Allowed types: PDF, DOC, DOCX, JPEG, PNG, GIF, WEBP`);
+    }
+
+    // Verify teacher owns the assignment through internal mutation
+    const hasPermission = await ctx.runQuery(api.assignments.checkTeacherPermissionInternal, {
+      assignmentId: args.assignmentId,
+      userId: user._id,
+    });
+
+    if (!hasPermission) {
+      throw new Error("Only the teacher can add attachments to assignments");
+    }
+
+    // Generate S3 key and get presigned URL
+    const key = `assignments/${args.assignmentId}/${Date.now()}_${args.filename}`;
+    const { uploadUrl, fileUrl } = await ctx.runAction(api.s3.generateUploadUrl, {
+      key,
+      contentType: args.contentType,
+      expiresInSeconds: 300, // 5 minutes
+    });
+
+    // Pre-create the attachment record
+    const attachmentId = await ctx.runMutation(api.assignments.createAttachmentRecord, {
+      assignmentId: args.assignmentId,
+      filename: args.filename,
+      url: fileUrl,
+      size: args.size,
+      mimeType: args.contentType,
+    });
+
+    return { uploadUrl, fileUrl, attachmentId };
+  },
+});
+
+export const createAttachmentRecord = mutation({
+  args: {
+    assignmentId: v.id("assignments"),
+    filename: v.string(),
+    url: v.string(),
+    size: v.number(),
+    mimeType: v.string(),
+  },
+  returns: v.id("assignmentAttachments"),
+  handler: async (ctx, args): Promise<Id<"assignmentAttachments">> => {
+    return await ctx.db.insert("assignmentAttachments", {
+      ...args,
+      uploadedAt: Date.now(),
+    });
+  },
+});
+
+export const confirmAttachmentUpload = mutation({
+  args: {
+    attachmentId: v.id("assignmentAttachments"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    // Verify the attachment exists (this confirms the upload was initiated)
+    const attachment = await ctx.db.get(args.attachmentId);
+    if (!attachment) {
+      throw new Error("Attachment not found");
+    }
+    // The file is already in S3 at this point, so we just confirm the record exists
+    return null;
+  },
+});
+
+export const getAssignmentAttachments = query({
+  args: {
+    assignmentId: v.id("assignments"),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("assignmentAttachments"),
+      _creationTime: v.number(),
+      assignmentId: v.id("assignments"),
+      filename: v.string(),
+      url: v.string(),
+      size: v.number(),
+      mimeType: v.string(),
+      uploadedAt: v.number(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.runQuery(api.users.getUserByUsername, {
+      username: usernameFromIdentity(identity),
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Verify user can view this assignment's attachments
+    const assignment = await ctx.db.get(args.assignmentId);
+    if (!assignment) {
+      throw new Error("Assignment not found");
+    }
+
+    const cls = await ctx.db.get(assignment.classId);
+    if (!cls) {
+      throw new Error("Class not found");
+    }
+
+    const isTeacher = cls.teacherId === user._id || assignment.creatorId === user._id;
+    const isEnrolled = await ctx.db
+      .query("enrollments")
+      .withIndex("by_class_and_student", (q) =>
+        q.eq("classId", assignment.classId).eq("studentId", user._id)
+      )
+      .unique();
+
+    if (!isTeacher && !isEnrolled) {
+      throw new Error("Not authorized to view attachments for this assignment");
+    }
+
+    const attachments = await ctx.db
+      .query("assignmentAttachments")
+      .withIndex("by_assignment", (q) => q.eq("assignmentId", args.assignmentId))
+      .collect();
+
+    return attachments;
+  },
+});
+
+export const deleteAssignmentAttachment = mutation({
+  args: {
+    attachmentId: v.id("assignmentAttachments"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.runQuery(api.users.getUserByUsername, {
+      username: usernameFromIdentity(identity),
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const attachment = await ctx.db.get(args.attachmentId);
+    if (!attachment) {
+      throw new Error("Attachment not found");
+    }
+
+    const assignment = await ctx.db.get(attachment.assignmentId);
+    if (!assignment) {
+      throw new Error("Assignment not found");
+    }
+
+    const cls = await ctx.db.get(assignment.classId);
+    if (!cls) {
+      throw new Error("Class not found");
+    }
+
+    // Only teacher or creator can delete
+    if (cls.teacherId !== user._id && assignment.creatorId !== user._id) {
+      throw new Error("Only the teacher can delete attachments");
+    }
+
+    await ctx.db.delete(args.attachmentId);
+    return null;
+  },
+});
+
+// Submission attachment functions
+export const uploadSubmissionAttachment = action({
+  args: {
+    assignmentId: v.id("assignments"),
+    filename: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+  },
+  returns: v.object({
+    uploadUrl: v.string(),
+    fileUrl: v.string(),
+    attachmentId: v.id("submissionAttachments"),
+  }),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.runQuery(api.users.getUserByUsername, {
+      username: usernameFromIdentity(identity),
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (user.role !== "student") {
+      throw new Error("Only students can submit assignment attachments");
+    }
+
+    // Validate file size
+    if (args.size > MAX_FILE_SIZE) {
+      throw new Error(`File size exceeds maximum allowed size of 50MB`);
+    }
+
+    // Validate mime type
+    if (!isValidMimeType(args.contentType)) {
+      throw new Error(`File type ${args.contentType} is not allowed. Allowed types: PDF, DOC, DOCX, JPEG, PNG, GIF, WEBP`);
+    }
+
+    // Get assignment and verify student is enrolled
+    const assignment = await ctx.runQuery(api.assignments.getAssignmentById, {
+      assignmentId: args.assignmentId,
+    });
+
+    if (!assignment) {
+      throw new Error("Assignment not found");
+    }
+
+    const isEnrolled = await ctx.db
+      .query("enrollments")
+      .withIndex("by_class_and_student", (q) =>
+        q.eq("classId", assignment.classId).eq("studentId", user._id)
+      )
+      .unique();
+
+    if (!isEnrolled) {
+      throw new Error("Not enrolled in this class");
+    }
+
+    // Get or create submission
+    let submission = await ctx.db
+      .query("submissions")
+      .withIndex("by_assignment_and_student", (q) =>
+        q.eq("assignmentId", args.assignmentId).eq("studentId", user._id)
+      )
+      .unique();
+
+    if (!submission) {
+      // Create a submission first
+      const submissionId = await ctx.runMutation(api.submissions.createSubmissionForAttachment, {
+        assignmentId: args.assignmentId,
+        studentId: user._id,
+      });
+      submission = await ctx.db.get(submissionId);
+      if (!submission) {
+        throw new Error("Failed to create submission");
+      }
+    }
+
+    // Generate S3 key and get presigned URL
+    const key = `submissions/${submission._id}/${Date.now()}_${args.filename}`;
+    const { uploadUrl, fileUrl } = await ctx.runAction(api.s3.generateUploadUrl, {
+      key,
+      contentType: args.contentType,
+      expiresInSeconds: 300, // 5 minutes
+    });
+
+    // Pre-create the attachment record
+    const attachmentId = await ctx.runMutation(api.assignments.createSubmissionAttachmentRecord, {
+      submissionId: submission._id,
+      filename: args.filename,
+      url: fileUrl,
+      size: args.size,
+      mimeType: args.contentType,
+    });
+
+    return { uploadUrl, fileUrl, attachmentId };
+  },
+});
+
+export const createSubmissionAttachmentRecord = mutation({
+  args: {
+    submissionId: v.id("submissions"),
+    filename: v.string(),
+    url: v.string(),
+    size: v.number(),
+    mimeType: v.string(),
+  },
+  returns: v.id("submissionAttachments"),
+  handler: async (ctx, args): Promise<Id<"submissionAttachments">> => {
+    return await ctx.db.insert("submissionAttachments", {
+      ...args,
+      uploadedAt: Date.now(),
+    });
+  },
+});
+
+export const confirmSubmissionAttachmentUpload = mutation({
+  args: {
+    attachmentId: v.id("submissionAttachments"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const attachment = await ctx.db.get(args.attachmentId);
+    if (!attachment) {
+      throw new Error("Attachment not found");
+    }
+    return null;
+  },
+});
+
+export const getSubmissionAttachments = query({
+  args: {
+    submissionId: v.id("submissions"),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("submissionAttachments"),
+      _creationTime: v.number(),
+      submissionId: v.id("submissions"),
+      filename: v.string(),
+      url: v.string(),
+      size: v.number(),
+      mimeType: v.string(),
+      uploadedAt: v.number(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.runQuery(api.users.getUserByUsername, {
+      username: usernameFromIdentity(identity),
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Verify user can view this submission's attachments
+    const submission = await ctx.db.get(args.submissionId);
+    if (!submission) {
+      throw new Error("Submission not found");
+    }
+
+    const assignment = await ctx.db.get(submission.assignmentId);
+    if (!assignment) {
+      throw new Error("Assignment not found");
+    }
+
+    const cls = await ctx.db.get(assignment.classId);
+    if (!cls) {
+      throw new Error("Class not found");
+    }
+
+    const isTeacher = cls.teacherId === user._id || assignment.creatorId === user._id;
+    const isOwner = submission.studentId === user._id;
+
+    if (!isTeacher && !isOwner) {
+      throw new Error("Not authorized to view these attachments");
+    }
+
+    const attachments = await ctx.db
+      .query("submissionAttachments")
+      .withIndex("by_submission", (q) => q.eq("submissionId", args.submissionId))
+      .collect();
+
+    return attachments;
+  },
+});
+
+export const deleteSubmissionAttachment = mutation({
+  args: {
+    attachmentId: v.id("submissionAttachments"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.runQuery(api.users.getUserByUsername, {
+      username: usernameFromIdentity(identity),
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const attachment = await ctx.db.get(args.attachmentId);
+    if (!attachment) {
+      throw new Error("Attachment not found");
+    }
+
+    const submission = await ctx.db.get(attachment.submissionId);
+    if (!submission) {
+      throw new Error("Submission not found");
+    }
+
+    // Only the student who submitted can delete their own attachments
+    if (submission.studentId !== user._id) {
+      throw new Error("You can only delete your own attachments");
+    }
+
+    await ctx.db.delete(args.attachmentId);
+    return null;
   },
 });

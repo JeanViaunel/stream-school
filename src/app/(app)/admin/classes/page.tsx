@@ -257,9 +257,9 @@ export default function AdminClassesPage() {
                             (cls.teacherId as unknown as string)
                           }
                           onValueChange={(value) =>
-                            setTeacherDraftByClassId((prev) => ({
+                            setTeacherDraftByClassId((prev: Record<string, string | undefined>) => ({
                               ...prev,
-                              [cls._id]: value,
+                              [cls._id]: value ?? undefined,
                             }))
                           }
                           disabled={
@@ -297,9 +297,9 @@ export default function AdminClassesPage() {
                         <Select
                           value={studentDraftByClassId[cls._id] ?? ""}
                           onValueChange={(value) =>
-                            setStudentDraftByClassId((prev) => ({
+                            setStudentDraftByClassId((prev: Record<string, string | undefined>) => ({
                               ...prev,
-                              [cls._id]: value,
+                              [cls._id]: value ?? undefined,
                             }))
                           }
                           disabled={

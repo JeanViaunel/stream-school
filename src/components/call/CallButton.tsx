@@ -53,7 +53,7 @@ export function CallButton() {
 
     setLoading(true);
     try {
-      if (isClassroomChannel) {
+      if (isClassroomChannel && channel.id) {
         await authorizeClassroomCallStart({ streamChannelId: channel.id });
       }
 

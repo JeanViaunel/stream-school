@@ -13,7 +13,8 @@ import { Gradebook } from "@/components/gradebook/Gradebook";
 import { ClassOverview } from "./ClassOverview";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
-import { ExternalLink, Video, LayoutDashboard, MessageSquare, GraduationCap, Calendar } from "lucide-react";
+import { ExternalLink, Video, LayoutDashboard, MessageSquare, GraduationCap, Calendar, FileText } from "lucide-react";
+import { AssignmentManagement } from "./AssignmentManagement";
 
 interface ClassroomTabsProps {
   classId: Id<"classes">;
@@ -107,49 +108,76 @@ export function ClassroomTabs({ classId, teacherId, chatPanel, className = "Clas
 
       <TabsContent
         value="grades"
-        className="mt-0 flex-1 overflow-auto p-4 data-[state=inactive]:hidden"
+        className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden"
       >
-        {isTeacherOrAdmin ? (
-          <Gradebook classId={classId} />
-        ) : session.role === "student" && myGrades ? (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>My grades</CardTitle>
-              {myGrades.overallAverage !== null && (
-                <Badge variant="secondary">Overall {myGrades.overallAverage}%</Badge>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {myGrades.grades.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No grades yet for this class.</p>
-              ) : (
-                <ul className="space-y-3">
-                  {myGrades.grades.map((g) => (
-                    <li
-                      key={g._id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"
-                    >
-                      <div>
-                        <p className="font-medium">{g.assignmentTitle}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Graded {format(g.gradedAt, "PPP")}
-                        </p>
-                        {g.feedback && (
-                          <p className="mt-1 text-sm text-muted-foreground">{g.feedback}</p>
-                        )}
-                      </div>
-                      <Badge>
-                        {g.score}/{g.maxScore}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <p className="text-sm text-muted-foreground">Grades are not available for your role.</p>
-        )}
+        <Tabs defaultValue="assignments" className="flex min-h-0 flex-1 flex-col">
+          <div className="border-b border-border bg-card px-4 pt-2">
+            <TabsList className="w-full justify-start gap-1 bg-transparent p-0">
+              <TabsTrigger value="assignments" className="rounded-md px-3 flex items-center gap-1.5 text-sm">
+                <FileText className="h-4 w-4" />
+                Assignments
+              </TabsTrigger>
+              <TabsTrigger value="grades" className="rounded-md px-3 flex items-center gap-1.5 text-sm">
+                <GraduationCap className="h-4 w-4" />
+                {isTeacherOrAdmin ? "Gradebook" : "My Grades"}
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent
+            value="assignments"
+            className="mt-0 flex-1 overflow-auto data-[state=inactive]:hidden"
+          >
+            <AssignmentManagement classId={classId} teacherId={teacherId} />
+          </TabsContent>
+
+          <TabsContent
+            value="grades"
+            className="mt-0 flex-1 overflow-auto p-4 data-[state=inactive]:hidden"
+          >
+            {isTeacherOrAdmin ? (
+              <Gradebook classId={classId} />
+            ) : session.role === "student" && myGrades ? (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>My grades</CardTitle>
+                  {myGrades.overallAverage !== null && (
+                    <Badge variant="secondary">Overall {myGrades.overallAverage}%</Badge>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {myGrades.grades.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No grades yet for this class.</p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {myGrades.grades.map((g) => (
+                        <li
+                          key={g._id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"
+                        >
+                          <div>
+                            <p className="font-medium">{g.assignmentTitle}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Graded {format(g.gradedAt, "PPP")}
+                            </p>
+                            {g.feedback && (
+                              <p className="mt-1 text-sm text-muted-foreground">{g.feedback}</p>
+                            )}
+                          </div>
+                          <Badge>
+                            {g.score}/{g.maxScore}
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <p className="text-sm text-muted-foreground">Grades are not available for your role.</p>
+            )}
+          </TabsContent>
+        </Tabs>
       </TabsContent>
 
       <TabsContent

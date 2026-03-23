@@ -232,7 +232,7 @@ export function AdminClassQuickActions({
                 <Label htmlFor="assign-teacher-select">Teacher</Label>
                 <Select
                   value={teacherIdDraft}
-                  onValueChange={setTeacherIdDraft}
+                  onValueChange={(value) => value && setTeacherIdDraft(value)}
                   disabled={!teachers.length || assigningTeacher}
                 >
                   <SelectTrigger id="assign-teacher-select" className="w-full">
@@ -280,7 +280,7 @@ export function AdminClassQuickActions({
                 <Label htmlFor="add-student-select">Student</Label>
                 <Select
                   value={studentIdDraft}
-                  onValueChange={setStudentIdDraft}
+                  onValueChange={(value) => value && setStudentIdDraft(value)}
                   disabled={!students.length || addingStudent}
                 >
                   <SelectTrigger id="add-student-select" className="w-full">
