@@ -14,7 +14,8 @@ import {
   School,
   ChevronRight,
   Plus,
-  Shield
+  Shield,
+  ShieldAlert
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -129,7 +130,7 @@ export default function AdminPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-6 md:grid-cols-2 mb-8">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -167,6 +168,28 @@ export default function AdminPage() {
               <Link href="/admin/classes" className="flex-1">
                 <Button variant="outline" className="w-full">
                   View All Classes
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5" />
+              Content Moderation
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Review flagged messages, manage content violations, and ensure safe classroom communication.
+            </p>
+            <div className="flex gap-2">
+              <Link href="/admin/moderation" className="flex-1">
+                <Button variant="outline" className="w-full">
+                  View Moderation Queue
                   <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>

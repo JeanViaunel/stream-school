@@ -157,4 +157,22 @@ export default defineSchema({
   })
     .index("by_poll", ["pollId"])
     .index("by_poll_and_student", ["pollId", "studentId"]),
+
+  moderationFlags: defineTable({
+    messageId: v.string(),
+    channelId: v.string(),
+    userId: v.id("users"),
+    messageText: v.string(),
+    toxicityScore: v.number(),
+    severeToxicityScore: v.number(),
+    identityAttackScore: v.number(),
+    status: v.union(v.literal("pending"), v.literal("reviewed"), v.literal("actioned"), v.literal("dismissed")),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    organizationId: v.id("organizations"),
+    createdAt: v.number(),
+  })
+    .index("by_organization", ["organizationId"])
+    .index("by_status", ["status"])
+    .index("by_message", ["messageId"]),
 });

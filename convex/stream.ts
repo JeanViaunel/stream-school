@@ -99,3 +99,18 @@ export const removeMemberFromChannel = internalAction({
     return null;
   },
 });
+
+export const deleteMessage = internalAction({
+  args: {
+    messageId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (_ctx, { messageId }) => {
+    const chatClient = StreamChat.getInstance(
+      process.env.STREAM_API_KEY!,
+      process.env.STREAM_API_SECRET!
+    );
+    await chatClient.deleteMessage(messageId);
+    return null;
+  },
+});
