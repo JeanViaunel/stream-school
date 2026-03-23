@@ -25,8 +25,13 @@ export default function SessionPage() {
   useEffect(() => {
     if (classData === null) {
       router.push("/dashboard");
+      return;
     }
-  }, [classData, router]);
+    // Admins cannot start or join classroom sessions — redirect back to the class page.
+    if (session && session.role === "admin") {
+      router.push(`/class/${classId}`);
+    }
+  }, [classData, session, router, classId]);
 
   if (classData === undefined) {
     return (

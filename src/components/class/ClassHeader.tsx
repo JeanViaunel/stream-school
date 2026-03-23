@@ -56,6 +56,8 @@ export function ClassHeader({
   const isTeacher = session?.userId === classData.teacherId;
   const isAdmin = session?.role === "admin";
   const isArchived = classData.isArchived ?? false;
+  // Admins manage classes but cannot start/host classroom video sessions — only teachers can.
+  const canStartSession = isTeacher && !isAdmin;
 
   const teacherMenu = isTeacher && !isAdmin && (
     <DropdownMenu>
@@ -120,7 +122,7 @@ export function ClassHeader({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {isTeacher ? (
+            {canStartSession ? (
               <Button
                 size="lg"
                 className="h-14 rounded-xl px-6"
@@ -129,7 +131,7 @@ export function ClassHeader({
                 <Play className="mr-2 h-6 w-6" />
                 Start
               </Button>
-            ) : isActiveSession ? (
+            ) : isActiveSession && !isAdmin ? (
               <Button
                 size="lg"
                 className="h-14 rounded-xl px-6"
@@ -138,6 +140,11 @@ export function ClassHeader({
                 <Play className="mr-2 h-6 w-6" />
                 Join
               </Button>
+            ) : isAdmin && isActiveSession ? (
+              <Badge className="bg-green-500/20 text-green-600">
+                <span className="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+                Live
+              </Badge>
             ) : null}
             {teacherMenu}
             {adminMenu}
@@ -203,7 +210,7 @@ export function ClassHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          {isTeacher ? (
+          {canStartSession ? (
             <>
               <Button onClick={onStartSession} className="gap-2">
                 <Play className="h-4 w-4" />
@@ -214,16 +221,22 @@ export function ClassHeader({
             </>
           ) : (
             <>
-              {isActiveSession ? (
+              {isActiveSession && !isAdmin ? (
                 <Button onClick={onJoinSession} className="gap-2">
                   <Play className="h-4 w-4" />
                   Join Session
                 </Button>
-              ) : (
+              ) : isAdmin && isActiveSession ? (
+                <Badge className="bg-green-500/20 text-green-600">
+                  <span className="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+                  Session live
+                </Badge>
+              ) : !isAdmin ? (
                 <Badge variant="outline" className="text-muted-foreground">
                   No active session
                 </Badge>
-              )}
+              ) : null}
+              {teacherMenu}
               {adminMenu}
             </>
           )}

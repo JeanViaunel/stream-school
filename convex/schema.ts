@@ -208,6 +208,27 @@ export default defineSchema({
     .index("by_class", ["classId"])
     .index("by_class_and_scheduled_at", ["classId", "scheduledAt"]),
 
+  meetings: defineTable({
+    organizationId: v.id("organizations"),
+    hostId: v.id("users"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    streamCallId: v.string(),
+    scheduledAt: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
+    endedAt: v.optional(v.number()),
+    status: v.union(
+      v.literal("scheduled"),
+      v.literal("active"),
+      v.literal("ended"),
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_organization", ["organizationId"])
+    .index("by_host", ["hostId"])
+    .index("by_stream_call_id", ["streamCallId"])
+    .index("by_organization_and_status", ["organizationId", "status"]),
+
   auditLogs: defineTable({
     organizationId: v.id("organizations"),
     actorId: v.id("users"),

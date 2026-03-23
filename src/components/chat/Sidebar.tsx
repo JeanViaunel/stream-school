@@ -38,6 +38,7 @@ import {
   Shield,
   ChevronDown,
   ChevronRight,
+  Video,
 } from "lucide-react";
 import {
   ContextMenu,
@@ -383,6 +384,21 @@ export function Sidebar() {
                 </div>
               )}
             </div>
+
+            {/* Meetings link (teachers + admins) */}
+            {(isAdmin || session?.role === "teacher" || session?.role === "co_teacher") && (
+              <Link href="/meetings">
+                <div className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer",
+                  pathname === "/meetings"
+                    ? "bg-primary/10 text-primary"
+                    : "text-foreground hover:bg-muted",
+                )}>
+                  <Video className="h-4 w-4" />
+                  <span>Meetings</span>
+                </div>
+              </Link>
+            )}
 
             {/* Divider */}
             <div className="my-2 h-px bg-border/60" />

@@ -40,6 +40,23 @@ export const createSession = mutation({
       throw new Error("Not authenticated");
     }
 
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const cls = await ctx.db.get(args.classId);
+    if (!cls) throw new Error("Class not found");
+
+    const isClassTeacher = cls.teacherId === user._id;
+    const hasTeacherRole = user.role === "teacher" || user.role === "co_teacher";
+
+    if (!isClassTeacher || !hasTeacherRole) {
+      throw new Error("Only the class teacher can start a session");
+    }
+
     const sessionId: Id<"sessions"> = await ctx.db.insert("sessions", {
       classId: args.classId,
       hostId: args.hostId,

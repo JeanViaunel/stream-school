@@ -16,13 +16,14 @@ import {
   Plus,
   BookOpen,
   Users,
-  GraduationCap,
   Hash,
   ChevronRight,
   School,
+  Video,
 } from "lucide-react";
 import { CalendarView } from "@/components/schedule/CalendarView";
 import { CreateClassModal } from "@/components/class/CreateClassModal";
+import { CreateMeetingModal } from "@/components/meetings/CreateMeetingModal";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const [joinCode, setJoinCode] = useState("");
   const [showJoinDialog, setShowJoinDialog] = useState(false);
   const [createClassOpen, setCreateClassOpen] = useState(false);
+  const [createMeetingOpen, setCreateMeetingOpen] = useState(false);
   
   const teacherLikeRoles =
     session?.role === "teacher" ||
@@ -207,6 +209,10 @@ export default function DashboardPage() {
               Manage your classes and sessions
             </p>
           </div>
+          <Button onClick={() => setCreateMeetingOpen(true)} className="gap-2 shrink-0">
+            <Video className="h-4 w-4" />
+            New Meeting
+          </Button>
         </header>
 
         <div className="mb-8">
@@ -248,6 +254,7 @@ export default function DashboardPage() {
         </div>
         </section>
         <CreateClassModal open={createClassOpen} onOpenChange={setCreateClassOpen} />
+        <CreateMeetingModal open={createMeetingOpen} onOpenChange={setCreateMeetingOpen} />
       </div>
     );
   }
@@ -286,13 +293,19 @@ export default function DashboardPage() {
   // Admin dashboard
   return (
     <div className="container mx-auto p-6 max-w-6xl">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">
-          Admin Dashboard
-        </h1>
-        <p className="text-muted-foreground">
-          Manage your organization
-        </p>
+      <header className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">
+            Admin Dashboard
+          </h1>
+          <p className="text-muted-foreground">
+            Manage your organization
+          </p>
+        </div>
+        <Button onClick={() => setCreateMeetingOpen(true)} className="gap-2 shrink-0">
+          <Video className="h-4 w-4" />
+          New Meeting
+        </Button>
       </header>
 
       <div className="mb-8">
@@ -324,6 +337,12 @@ export default function DashboardPage() {
               <Button variant="ghost" className="w-full justify-start">
                 <School className="w-4 h-4 mr-2" />
                 Admin Panel
+              </Button>
+            </Link>
+            <Link href="/meetings">
+              <Button variant="ghost" className="w-full justify-start">
+                <Video className="w-4 h-4 mr-2" />
+                Meetings
               </Button>
             </Link>
           </CardContent>
@@ -379,6 +398,7 @@ export default function DashboardPage() {
           </p>
         )}
       </section>
+      <CreateMeetingModal open={createMeetingOpen} onOpenChange={setCreateMeetingOpen} />
     </div>
   );
 }
