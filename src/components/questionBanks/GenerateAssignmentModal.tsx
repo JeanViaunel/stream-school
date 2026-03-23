@@ -362,17 +362,19 @@ export function GenerateAssignmentModal({
                 <div className="space-y-2">
                   <Label>Due Date (optional)</Label>
                   <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !dueDate && "text-muted-foreground"
-                        )}
-                      >
-                        {dueDate ? format(dueDate, "PPP") : "No due date"}
-                      </Button>
-                    </PopoverTrigger>
+                    <PopoverTrigger
+                      render={
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !dueDate && "text-muted-foreground"
+                          )}
+                        >
+                          {dueDate ? format(dueDate, "PPP") : "No due date"}
+                        </Button>
+                      }
+                    />
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"

@@ -15,8 +15,6 @@ import {
   VideoOff,
   Monitor,
   MonitorOff,
-  Users,
-  MessageSquare,
   PhoneOff,
   LogOut,
   X,
@@ -24,8 +22,6 @@ import {
   Maximize2,
   Presentation,
   Settings,
-  Volume2,
-  Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,13 +44,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { VolumeIndicator } from "./VolumeVisualizer";
 import { ToggleClosedCaptions } from "./ToggleClosedCaptions";
 import { VirtualBackgroundToggle } from "./VirtualBackgroundToggle";
@@ -192,37 +181,9 @@ function LayoutSwitcher({ currentLayout, onLayoutChange }: LayoutSwitcherProps) 
   );
 }
 
-// Device Settings Component
-function DeviceSettings() {
-  const { useMicrophoneState, useCameraState, useSpeakerState } = useCallStateHooks();
-  const { microphone, selectedDevice: selectedMic, devices: micDevices, hasBrowserPermission: hasMicPermission } = useMicrophoneState();
-  const { camera, selectedDevice: selectedCamera, devices: cameraDevices, hasBrowserPermission: hasCameraPermission } = useCameraState();
-  const { speaker, selectedDevice: selectedSpeaker, devices: speakerDevices, isDeviceSelectionSupported } = useSpeakerState();
-  
+// Device Settings Button Component - uses Stream SDK's DeviceSettings
+function DeviceSettingsButton() {
   const [isOpen, setIsOpen] = useState(false);
-
-  const handleMicChange = async (deviceId: string) => {
-    if (deviceId && deviceId !== "default") {
-      await microphone.select(deviceId);
-    }
-  };
-
-  const handleCameraChange = async (deviceId: string) => {
-    if (deviceId && deviceId !== "default") {
-      await camera.select(deviceId);
-    }
-  };
-
-  const handleSpeakerChange = async (deviceId: string) => {
-    if (deviceId && deviceId !== "default") {
-      await speaker.select(deviceId);
-    }
-  };
-
-  // Find selected device labels
-  const selectedMicDevice = micDevices.find(d => d.deviceId === selectedMic);
-  const selectedCameraDevice = cameraDevices.find(d => d.deviceId === selectedCamera);
-  const selectedSpeakerDevice = speakerDevices.find(d => d.deviceId === selectedSpeaker);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -256,127 +217,8 @@ function DeviceSettings() {
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6 py-4">
-          {/* Microphone Selection */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-white/80 flex items-center gap-2">
-              <Mic className="h-4 w-4" />
-              Microphone
-            </label>
-            {!hasMicPermission ? (
-              <div className="text-sm text-amber-400/80 bg-amber-500/10 rounded-lg p-3 border border-amber-500/20">
-                Please allow microphone access in your browser settings
-              </div>
-            ) : micDevices.length === 0 ? (
-              <div className="text-sm text-white/50">No microphones detected</div>
-            ) : (
-              <Select value={selectedMic || "default"} onValueChange={handleMicChange}>
-                <SelectTrigger className="bg-white/5 border-white/10 text-white hover:bg-white/10">
-                  <SelectValue placeholder="Select microphone" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-white/10">
-                  <SelectItem value="default" className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white">
-                    Default
-                  </SelectItem>
-                  {micDevices.map((device) => (
-                    <SelectItem 
-                      key={device.deviceId} 
-                      value={device.deviceId}
-                      className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
-                    >
-                      {device.label || `Microphone ${device.deviceId.slice(0, 8)}...`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {selectedMicDevice && (
-              <p className="text-xs text-white/40">
-                Current: {selectedMicDevice.label || "Default"}
-              </p>
-            )}
-          </div>
-
-          {/* Camera Selection */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-white/80 flex items-center gap-2">
-              <Video className="h-4 w-4" />
-              Camera
-            </label>
-            {!hasCameraPermission ? (
-              <div className="text-sm text-amber-400/80 bg-amber-500/10 rounded-lg p-3 border border-amber-500/20">
-                Please allow camera access in your browser settings
-              </div>
-            ) : cameraDevices.length === 0 ? (
-              <div className="text-sm text-white/50">No cameras detected</div>
-            ) : (
-              <Select value={selectedCamera || "default"} onValueChange={handleCameraChange}>
-                <SelectTrigger className="bg-white/5 border-white/10 text-white hover:bg-white/10">
-                  <SelectValue placeholder="Select camera" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-white/10">
-                  <SelectItem value="default" className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white">
-                    Default
-                  </SelectItem>
-                  {cameraDevices.map((device) => (
-                    <SelectItem 
-                      key={device.deviceId} 
-                      value={device.deviceId}
-                      className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
-                    >
-                      {device.label || `Camera ${device.deviceId.slice(0, 8)}...`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {selectedCameraDevice && (
-              <p className="text-xs text-white/40">
-                Current: {selectedCameraDevice.label || "Default"}
-              </p>
-            )}
-          </div>
-
-          {/* Speaker Selection */}
-          {isDeviceSelectionSupported && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-white/80 flex items-center gap-2">
-                <Volume2 className="h-4 w-4" />
-                Speaker / Audio Output
-              </label>
-              {speakerDevices.length === 0 ? (
-                <div className="text-sm text-white/50">No audio output devices detected</div>
-              ) : (
-                <Select value={selectedSpeaker || "default"} onValueChange={handleSpeakerChange}>
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white hover:bg-white/10">
-                    <SelectValue placeholder="Select speaker" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-white/10">
-                    <SelectItem value="default" className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white">
-                      Default
-                    </SelectItem>
-                    {speakerDevices.map((device) => (
-                      <SelectItem 
-                        key={device.deviceId} 
-                        value={device.deviceId}
-                        className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
-                      >
-                        {device.label || `Speaker ${device.deviceId.slice(0, 8)}...`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          )}
-
-          {/* Browser Info */}
-          <div className="pt-4 border-t border-white/10">
-            <p className="text-xs text-white/40 flex items-center gap-1">
-              <Smartphone className="h-3 w-3" />
-              Device preferences are automatically saved for future calls
-            </p>
-          </div>
+        <div className="py-4">
+          <DeviceSettings />
         </div>
       </DialogContent>
     </Dialog>
@@ -536,7 +378,7 @@ export function FloatingControls({
           />
 
           {/* Settings */}
-          <DeviceSettings />
+          <DeviceSettingsButton />
 
           {/* Leave button - opens confirmation modal */}
           <button

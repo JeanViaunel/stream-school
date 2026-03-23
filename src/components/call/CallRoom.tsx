@@ -184,7 +184,9 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
   // Render the appropriate video layout
   const renderVideoLayout = () => {
     const layoutProps = {
-      className: "w-full h-full"
+      className: "w-full h-full",
+      // Local video is shown in SelfView (PiP); omit local from grid/speaker to avoid duplicate camera tiles.
+      excludeLocalParticipant: true,
     };
     switch (layout) {
       case "grid":

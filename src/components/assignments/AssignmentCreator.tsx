@@ -362,18 +362,20 @@ export function AssignmentCreator({ classId, sessionId, onSuccess }: AssignmentC
                     <span className="text-xs text-muted-foreground font-normal">(optional)</span>
                   </Label>
                   <Popover>
-                    <PopoverTrigger>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal h-11",
-                          !dueDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dueDate ? format(dueDate, "PPP") : "No due date"}
-                      </Button>
-                    </PopoverTrigger>
+                    <PopoverTrigger
+                      render={
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal h-11",
+                            !dueDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dueDate ? format(dueDate, "PPP") : "No due date"}
+                        </Button>
+                      }
+                    />
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"

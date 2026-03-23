@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   StreamCall,
   StreamTheme,
@@ -34,6 +34,7 @@ interface PendingUser {
   id: string;
   name: string;
   streamUserId: string;
+  requestId: Id<"sessionLobbyRequests">;
 }
 
 interface ClassCallRoomInnerProps {
@@ -54,6 +55,7 @@ function ClassCallRoomInner({
   className,
   teacherName,
   pendingUsers,
+  addPendingIfNew,
   onAdmit,
   onDeny,
   onMuteAll,
@@ -61,7 +63,15 @@ function ClassCallRoomInner({
   onEndForAll,
   activeSessionId,
 }: ClassCallRoomInnerProps & { activeSessionId?: Id<"sessions"> }) {
-  const { useCallCallingState, useParticipants, useCameraState, useMicrophoneState, useScreenShareState } = useCallStateHooks();
+  const {
+    useCallCallingState,
+    useParticipants,
+    useRemoteParticipants,
+    useCameraState,
+    useMicrophoneState,
+    useScreenShareState,
+  } = useCallStateHooks();
+  const remoteParticipants = useRemoteParticipants();
   const callingState = useCallCallingState();
   const participants = useParticipants();
   const { camera } = useCameraState();
@@ -88,6 +98,17 @@ function ClassCallRoomInner({
   useEffect(() => {
     lastParticipantCountRef.current = participants.length;
   }, [participants]);
+
+  // Teacher: when remote participants appear in reactive state, queue them for admit + toast.
+  // This complements call.session_participant_joined (some clients miss or filter WS events).
+  useEffect(() => {
+    if (!isTeacher) return;
+    for (const p of remoteParticipants) {
+      const streamUserId = p.userId;
+      if (!streamUserId) continue;
+      addPendingIfNew(streamUserId, p.name ?? streamUserId);
+    }
+  }, [isTeacher, remoteParticipants, addPendingIfNew]);
 
   // Track call duration while joined
   useEffect(() => {
@@ -297,6 +318,25 @@ export function ClassCallRoom({
   const isTeacher = session?.userId === teacherId;
   const hasJoinedRef = useRef(false);
 
+  const addPendingIfNew = useCallback(
+    (streamUserId: string, displayName: string) => {
+      if (!streamUserId || streamUserId === session?.streamUserId) return;
+      setPendingUsers((prev) => {
+        if (prev.some((u) => u.id === streamUserId)) return prev;
+        toast.info(`${displayName || "A participant"} is waiting to join`);
+        return [
+          ...prev,
+          {
+            id: streamUserId,
+            name: displayName || streamUserId,
+            streamUserId,
+          },
+        ];
+      });
+    },
+    [session?.streamUserId]
+  );
+
   useEffect(() => {
     if (!client || activeSession === undefined || hasJoinedRef.current) return;
 
@@ -362,33 +402,30 @@ export function ClassCallRoom({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, callId, isTeacher, activeSession]);
 
-  // Teacher: listen for students joining so they can be admitted
+  // Teacher: listen for students joining the call session (subscribe to the concrete event).
   useEffect(() => {
     if (!call || !isTeacher) return;
 
-    const handleEvent = (event: {
+    const handleSessionParticipantJoined = (event: {
       type: string;
-      participant?: { user_id?: string; user?: { id?: string; name?: string } };
+      participant?: { user?: { id?: string; name?: string } };
     }) => {
-      if (event.type === "call.session_participant_joined") {
-        const participant = event.participant;
-        if (!participant) return;
-        const userId = participant.user?.id ?? participant.user_id;
-        const userName = participant.user?.name ?? userId;
-        if (!userId) return;
-        setPendingUsers((prev) => {
-          if (prev.some((u) => u.id === userId)) return prev;
-          return [...prev, { id: userId, name: userName || userId, streamUserId: userId }];
-        });
-        toast.info(`${userName || "A student"} is waiting to join`);
-      }
+      if (event.type !== "call.session_participant_joined") return;
+      const participant = event.participant;
+      const userId = participant?.user?.id;
+      if (!userId) return;
+      const userName = participant.user?.name ?? userId;
+      addPendingIfNew(userId, userName);
     };
 
-    call.on("all", handleEvent);
+    const unsubscribe = call.on(
+      "call.session_participant_joined",
+      handleSessionParticipantJoined
+    );
     return () => {
-      call.off("all", handleEvent);
+      unsubscribe();
     };
-  }, [call, isTeacher]);
+  }, [call, isTeacher, addPendingIfNew]);
 
   // Student: listen for admission signal from the teacher
   useEffect(() => {
@@ -533,6 +570,7 @@ export function ClassCallRoom({
           className={className}
           teacherName={teacherName}
           pendingUsers={pendingUsers}
+          addPendingIfNew={addPendingIfNew}
           onAdmit={handleAdmit}
           onDeny={handleDeny}
           onMuteAll={handleMuteAll}

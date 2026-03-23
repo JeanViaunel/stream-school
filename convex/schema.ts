@@ -148,6 +148,23 @@ export default defineSchema({
     .index("by_session", ["sessionId"])
     .index("by_user", ["userId"]),
 
+  /** Students request access; teacher admits/denies before they may join the Stream call. */
+  sessionLobbyRequests: defineTable({
+    sessionId: v.id("sessions"),
+    userId: v.id("users"),
+    streamUserId: v.string(),
+    displayName: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("admitted"),
+      v.literal("denied")
+    ),
+    requestedAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_and_user", ["sessionId", "userId"]),
+
   assignments: defineTable({
     classId: v.id("classes"),
     creatorId: v.id("users"),

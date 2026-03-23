@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useBackgroundFilters } from "@stream-io/video-react-sdk";
-import { Camera, Sparkles, Blur, Image, X } from "lucide-react";
+import { Camera, Sparkles, X, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -76,53 +76,47 @@ export function VirtualBackgroundToggle() {
     return null;
   }
 
-  const triggerButton = (
-    <button
-      disabled={!isReady || isLoading}
-      className={cn(
-        "group relative flex h-14 w-14 items-center justify-center rounded-2xl",
-        "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
-        !isReady || isLoading
-          ? "bg-white/5 text-white/30 cursor-not-allowed border border-white/5"
-          : state.mode !== "none"
-            ? "bg-purple-500/30 text-purple-400 border border-purple-500/40"
-            : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5 hover:border-white/15"
-      )}
-    >
-      {isLoading ? (
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-      ) : (
-        <Camera className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
-      )}
-      
-      {/* Status indicator dot */}
-      {state.mode !== "none" && isReady && (
-        <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-      )}
-    </button>
+  const triggerClassName = cn(
+    "group relative flex h-14 w-14 items-center justify-center rounded-2xl",
+    "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+    !isReady || isLoading
+      ? "bg-white/5 text-white/30 cursor-not-allowed border border-white/5"
+      : state.mode !== "none"
+        ? "bg-purple-500/30 text-purple-400 border border-purple-500/40"
+        : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5 hover:border-white/15"
   );
 
   return (
     <TooltipProvider>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              {triggerButton}
-            </PopoverTrigger>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger>
+                <button type="button" disabled={!isReady || isLoading} className={triggerClassName}>
+                  {isLoading ? (
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  ) : (
+                    <Camera className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+                  )}
+                  {state.mode !== "none" && isReady && (
+                    <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                  )}
+                </button>
+              </PopoverTrigger>
+            }
+          />
           <TooltipContent side="top">
             <p>
-              {!isReady 
-                ? "Initializing background filters..." 
-                : state.mode !== "none" 
-                  ? "Background effect active" 
-                  : "Virtual Background"
-              }
+              {!isReady
+                ? "Initializing background filters..."
+                : state.mode !== "none"
+                  ? "Background effect active"
+                  : "Virtual Background"}
             </p>
           </TooltipContent>
         </Tooltip>
-        
+
         <PopoverContent 
           align="center" 
           side="top" 
@@ -179,7 +173,7 @@ export function VirtualBackgroundToggle() {
                     "flex h-10 w-10 items-center justify-center rounded-lg",
                     state.mode === "blur" ? "bg-purple-500/20" : "bg-white/10"
                   )}>
-                    <Blur className="h-5 w-5" />
+                    <Sparkles className="h-5 w-5" />
                   </div>
                   <div className="flex-1 text-left">
                     <span className="text-sm font-medium block">Background Blur</span>
@@ -193,7 +187,7 @@ export function VirtualBackgroundToggle() {
                 {/* Preset backgrounds */}
                 <div className="space-y-2">
                   <p className="text-xs text-white/50 flex items-center gap-1">
-                    <Image className="h-3 w-3" />
+                    <Layers className="h-3 w-3" />
                     Preset Backgrounds
                   </p>
                   <div className="grid grid-cols-3 gap-2">

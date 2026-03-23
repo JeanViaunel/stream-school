@@ -64,7 +64,7 @@ export function MobileNav() {
 
             return (
               <Link
-                key={item.href}
+                key={`${item.href}-${item.label}`}
                 href={item.href}
                 className={cn(
                   "flex flex-col items-center justify-center gap-0.5 w-full h-full",

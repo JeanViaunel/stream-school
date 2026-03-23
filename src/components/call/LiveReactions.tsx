@@ -145,18 +145,12 @@ export function LiveReactions() {
     setReactions((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
-  const triggerButton = (
-    <button
-      className={cn(
-        "group relative flex h-14 w-14 items-center justify-center rounded-2xl",
-        "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
-        isOpen
-          ? "bg-yellow-500/30 text-yellow-400 border border-yellow-500/40"
-          : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5 hover:border-white/15"
-      )}
-    >
-      <SmilePlus className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
-    </button>
+  const triggerClassName = cn(
+    "group relative flex h-14 w-14 items-center justify-center rounded-2xl",
+    "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+    isOpen
+      ? "bg-yellow-500/30 text-yellow-400 border border-yellow-500/40"
+      : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5 hover:border-white/15"
   );
 
   return (
@@ -170,16 +164,23 @@ export function LiveReactions() {
         />
       ))}
 
-      {/* Reaction picker */}
+      {/* Tooltip + popover share one trigger (one shared element node was rendering two buttons) */}
       <TooltipProvider>
         <Popover open={isOpen} onOpenChange={setIsOpen}>
           <Tooltip>
-            <TooltipTrigger render={triggerButton} />
+            <TooltipTrigger
+              render={
+                <PopoverTrigger>
+                  <button type="button" className={triggerClassName}>
+                    <SmilePlus className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+                  </button>
+                </PopoverTrigger>
+              }
+            />
             <TooltipContent side="top">
               <p>Send Reaction</p>
             </TooltipContent>
           </Tooltip>
-          <PopoverTrigger>{triggerButton}</PopoverTrigger>
           <PopoverContent
             align="center"
             side="top"
