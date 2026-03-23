@@ -20,12 +20,14 @@ interface CallMessageCardProps {
   callId: string;
   senderName: string;
   isOwnMessage: boolean;
+  canJoin?: boolean;
 }
 
 export function CallMessageCard({
   callId,
   senderName,
   isOwnMessage,
+  canJoin = true,
 }: CallMessageCardProps) {
   const router = useRouter();
   const videoClient = useStreamVideoClient();
@@ -123,6 +125,25 @@ export function CallMessageCard({
         <div>
           <p className="text-sm font-medium text-white/80">Missed call</p>
           <p className="text-xs text-white/40">from {senderName}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!canJoin) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 max-w-[280px]">
+        <div className="relative shrink-0">
+          <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/25" />
+          <div className="relative rounded-full bg-emerald-500/20 p-2">
+            <Video className="h-4 w-4 text-emerald-400" />
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-white">Session live</p>
+          <p className="text-xs text-emerald-400/80 truncate">
+            Started by {senderName}
+          </p>
         </div>
       </div>
     );

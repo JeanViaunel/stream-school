@@ -36,6 +36,7 @@ interface ClassHeaderProps {
   classData: Class;
   enrollmentCount: number;
   isActiveSession?: boolean;
+  activeSessionId?: Id<"sessions">;
   onStartSession?: () => void;
   onJoinSession?: () => void;
   onArchiveClass?: () => void;
@@ -45,6 +46,7 @@ export function ClassHeader({
   classData,
   enrollmentCount,
   isActiveSession = false,
+  activeSessionId,
   onStartSession,
   onJoinSession,
   onArchiveClass,
@@ -86,6 +88,7 @@ export function ClassHeader({
       classId={classData._id as Id<"classes">}
       currentTeacherId={classData.teacherId as Id<"users">}
       isArchived={isArchived}
+      activeSessionId={activeSessionId}
       onArchiveClass={onArchiveClass}
     />
   );

@@ -1,7 +1,8 @@
-import { mutation, query } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { usernameFromIdentity } from "./authHelpers";
+import { internal } from "./_generated/api";
 
 const ALLOWED_ROLES = ["teacher", "co_teacher", "admin"] as const;
 
@@ -66,24 +67,25 @@ export const createMeeting = mutation({
   },
 });
 
-export const endMeeting = mutation({
-  args: { meetingId: v.id("meetings") },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+// Internal helpers for endMeeting action
+const endMeetingValidator = v.union(
+  v.object({ ok: v.literal(true), streamCallId: v.string() }),
+  v.object({ ok: v.literal(false), error: v.string() }),
+);
 
+const validateEndMeeting = internalQuery({
+  args: { meetingId: v.id("meetings"), username: v.string() },
+  returns: endMeetingValidator,
+  handler: async (ctx, { meetingId, username }) => {
     const user = await ctx.db
       .query("users")
-      .withIndex("by_username", (q) =>
-        q.eq("username", usernameFromIdentity(identity)),
-      )
+      .withIndex("by_username", (q) => q.eq("username", username))
       .unique();
+    if (!user) return { ok: false as const, error: "User not found" };
 
-    if (!user) throw new Error("User not found");
-
-    const meeting = await ctx.db.get(args.meetingId);
-    if (!meeting) throw new Error("Meeting not found");
+    const meeting = await ctx.db.get(meetingId);
+    if (!meeting) return { ok: false as const, error: "Meeting not found" };
+    if (meeting.status === "ended") return { ok: false as const, error: "Meeting already ended" };
 
     const isHost = meeting.hostId === user._id;
     const isOrgAdmin =
@@ -92,10 +94,43 @@ export const endMeeting = mutation({
       user.organizationId === meeting.organizationId;
 
     if (!isHost && !isOrgAdmin) {
-      throw new Error("Only the host or an admin can end a meeting");
+      return { ok: false as const, error: "Only the host or an admin can end a meeting" };
     }
+    return { ok: true as const, streamCallId: meeting.streamCallId };
+  },
+});
 
-    await ctx.db.patch(args.meetingId, { status: "ended", endedAt: Date.now() });
+const markMeetingEnded = internalMutation({
+  args: { meetingId: v.id("meetings") },
+  returns: v.null(),
+  handler: async (ctx, { meetingId }) => {
+    await ctx.db.patch(meetingId, { status: "ended", endedAt: Date.now() });
+    return null;
+  },
+});
+
+export const endMeeting = action({
+  args: { meetingId: v.id("meetings") },
+  returns: v.null(),
+  handler: async (ctx, { meetingId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const result: { ok: boolean; streamCallId?: string; error?: string } =
+      await ctx.runQuery(internal.meetings.validateEndMeeting, {
+        meetingId,
+        username: usernameFromIdentity(identity),
+      });
+
+    if (!result.ok) throw new Error(result.error);
+
+    await ctx.runMutation(internal.meetings.markMeetingEnded, { meetingId });
+
+    // Terminate the Stream call server-side so no one can rejoin
+    await ctx.runAction(internal.stream.endVideoCall, {
+      callType: "default",
+      callId: result.streamCallId!,
+    });
 
     return null;
   },
@@ -187,5 +222,24 @@ export const getAllMeetingsByOrg = query({
     );
 
     return withHosts;
+  },
+});
+
+export const getMeetingByStreamCallId = query({
+  args: { streamCallId: v.string() },
+  returns: v.union(meetingRowValidator, v.null()),
+  handler: async (ctx, { streamCallId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const meeting = await ctx.db
+      .query("meetings")
+      .withIndex("by_stream_call_id", (q) => q.eq("streamCallId", streamCallId))
+      .unique();
+
+    if (!meeting) return null;
+
+    const host = await ctx.db.get(meeting.hostId);
+    return { ...meeting, hostDisplayName: host?.displayName };
   },
 });

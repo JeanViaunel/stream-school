@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { useAuth } from "@/contexts/AuthContext";
@@ -65,7 +65,7 @@ export default function MeetingsPage() {
     isAdmin ? {} : "skip",
   );
 
-  const endMeeting = useMutation(api.meetings.endMeeting);
+  const endMeeting = useAction(api.meetings.endMeeting);
 
   const meetings = isAdmin ? orgMeetings : myMeetings;
 
@@ -86,7 +86,7 @@ export default function MeetingsPage() {
 
   if (!canAccess) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
+      <div className="w-full px-4 md:px-6 py-6">
         <Card>
           <CardContent className="p-8 text-center">
             <p className="text-muted-foreground">
@@ -99,7 +99,7 @@ export default function MeetingsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="w-full px-4 md:px-6 py-6">
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">

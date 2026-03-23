@@ -101,7 +101,7 @@ export default function DashboardPage() {
   // Role-specific dashboards
   if (session.role === "student") {
     return (
-      <div className="container mx-auto p-6 max-w-6xl">
+      <div className="w-full px-4 md:px-6 py-6">
         <header className="mb-8">
           <h1 className="text-3xl font-bold mb-2">
             Welcome back, {session.displayName}!
@@ -199,7 +199,7 @@ export default function DashboardPage() {
 
   if (session.role === "teacher" || session.role === "co_teacher") {
     return (
-      <div className="container mx-auto p-6 max-w-6xl">
+      <div className="w-full px-4 md:px-6 py-6">
         <header className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2">
@@ -261,7 +261,7 @@ export default function DashboardPage() {
 
   if (session.role === "parent") {
     return (
-      <div className="container mx-auto p-6 max-w-6xl">
+      <div className="w-full px-4 md:px-6 py-6">
         <header className="mb-8">
           <h1 className="text-3xl font-bold mb-2">
             Parent Portal
@@ -292,7 +292,7 @@ export default function DashboardPage() {
 
   // Admin dashboard
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="w-full px-4 md:px-6 py-6">
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold mb-2">

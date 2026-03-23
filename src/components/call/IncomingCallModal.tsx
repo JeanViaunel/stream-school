@@ -13,6 +13,7 @@ import { Phone, PhoneOff, Video, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
 import { startRingtone } from "@/lib/settings";
+import { useAuth } from "@/contexts/AuthContext";
 
 function IncomingCallPanel({ call }: { call: Call }) {
   const router = useRouter();
@@ -177,9 +178,25 @@ function IncomingCallPanel({ call }: { call: Call }) {
 
 export function IncomingCallModal() {
   const calls = useCalls();
-  const ringingCalls = calls.filter(
-    (call) => call.ringing && !call.isCreatedByMe
-  );
+  const { session } = useAuth();
+  const isAdmin = session?.role === "admin";
+
+  const ringingCalls = calls.filter((call) => {
+    if (!call.ringing || call.isCreatedByMe) return false;
+    // Admins cannot join classroom sessions — silently decline the ring.
+    if (isAdmin && call.type === "classroom") return false;
+    return true;
+  });
+
+  // Auto-decline classroom rings directed at admins so the call state clears properly.
+  useEffect(() => {
+    if (!isAdmin) return;
+    calls.forEach((call) => {
+      if (call.ringing && !call.isCreatedByMe && call.type === "classroom") {
+        call.leave({ reject: true, reason: "decline" }).catch(() => {});
+      }
+    });
+  }, [calls, isAdmin]);
 
   return (
     <>

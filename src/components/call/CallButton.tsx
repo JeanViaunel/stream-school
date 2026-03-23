@@ -25,6 +25,11 @@ export function CallButton() {
   const channelData = channel.data as Record<string, unknown> | undefined;
   const activeCallId = channelData?.active_call_id as string | undefined;
 
+  // Admins cannot start or join calls in classroom channels.
+  if (session?.role === "admin" && channel.type === "classroom") {
+    return null;
+  }
+
   async function handleClick() {
     if (!videoClient || !session || !channel) return;
 

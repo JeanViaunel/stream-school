@@ -11,6 +11,7 @@ interface CallEndedProps {
   participantCount: number;
   dataUsage?: { sent: number; received: number };
   recordingAvailable?: boolean;
+  canRejoin?: boolean;
   onRejoin: () => void;
   onClose: () => void;
 }
@@ -38,6 +39,7 @@ export function CallEnded({
   participantCount,
   dataUsage,
   recordingAvailable,
+  canRejoin = true,
   onRejoin,
   onClose,
 }: CallEndedProps) {
@@ -152,18 +154,23 @@ export function CallEnded({
           <Button
             onClick={onClose}
             variant="outline"
-            className="flex-1 h-12 border-white/10 bg-white/5 text-white hover:bg-white/10"
+            className={cn(
+              "h-12 border-white/10 bg-white/5 text-white hover:bg-white/10",
+              canRejoin ? "flex-1" : "w-full"
+            )}
           >
             <X className="h-4 w-4 mr-2" />
             Close ({countdown}s)
           </Button>
-          <Button
-            onClick={onRejoin}
-            className="flex-1 h-12 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Rejoin
-          </Button>
+          {canRejoin && (
+            <Button
+              onClick={onRejoin}
+              className="flex-1 h-12 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Rejoin
+            </Button>
+          )}
         </div>
       </div>
     </div>

@@ -1,17 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import {
   StreamCall,
+  StreamTheme,
   SpeakerLayout,
   useStreamVideoClient,
   useCall,
+  useCallStateHooks,
   Call,
+  CallingState,
 } from "@stream-io/video-react-sdk";
 import { Button } from "@/components/ui/button";
 import { Lobby } from "./Lobby";
 import { LobbyAdmitter } from "./LobbyAdmitter";
+import { CallEnded } from "./CallEnded";
+import { FloatingControls } from "./FloatingControls";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGradeSkin } from "@/contexts/GradeSkinContext";
 import { toast } from "sonner";
@@ -46,7 +50,7 @@ function TranscriptionControls({ isTeacher }: { isTeacher: boolean }) {
   if (!isTeacher) return null;
 
   return (
-    <div className="absolute bottom-16 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+    <div className="absolute bottom-28 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
       <Button
         type="button"
         variant="secondary"
@@ -63,18 +67,141 @@ function TranscriptionControls({ isTeacher }: { isTeacher: boolean }) {
   );
 }
 
+interface PendingUser {
+  id: string;
+  name: string;
+  streamUserId: string;
+}
+
+interface ClassCallRoomInnerProps {
+  isTeacher: boolean;
+  className: string;
+  teacherName: string;
+  pendingUsers: PendingUser[];
+  onAdmit: (userId: string) => Promise<void>;
+  onDeny: (userId: string) => Promise<void>;
+  onMuteAll: () => Promise<void>;
+  onLeave: () => void;
+}
+
+function ClassCallRoomInner({
+  isTeacher,
+  className,
+  teacherName,
+  pendingUsers,
+  onAdmit,
+  onDeny,
+  onMuteAll,
+  onLeave,
+}: ClassCallRoomInnerProps) {
+  const { useCallCallingState, useParticipants } = useCallStateHooks();
+  const callingState = useCallCallingState();
+  const participants = useParticipants();
+  const call = useCall();
+  const { gradeBand } = useGradeSkin();
+  const isPrimaryBand = gradeBand === "primary";
+
+  const [showEnded, setShowEnded] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [wasTerminated, setWasTerminated] = useState(false);
+  const endHandledRef = useRef(false);
+  const lastParticipantCountRef = useRef(0);
+
+  useEffect(() => {
+    lastParticipantCountRef.current = participants.length;
+  }, [participants]);
+
+  // Track call duration while joined
+  useEffect(() => {
+    if (callingState !== CallingState.JOINED) return;
+    const interval = setInterval(() => {
+      setCallDuration((d) => d + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [callingState]);
+
+  // Detect when call ends (either by host or by leaving)
+  useEffect(() => {
+    if (callingState !== CallingState.LEFT) return;
+    if (endHandledRef.current) return;
+    endHandledRef.current = true;
+
+    const terminated = !!call?.state.endedAt;
+    setWasTerminated(terminated);
+    setShowEnded(true);
+  }, [callingState, call?.state.endedAt]);
+
+  if (showEnded) {
+    return (
+      <CallEnded
+        duration={callDuration}
+        participantCount={lastParticipantCountRef.current}
+        canRejoin={!wasTerminated}
+        onRejoin={() => {
+          endHandledRef.current = false;
+          setShowEnded(false);
+          window.location.reload();
+        }}
+        onClose={onLeave}
+      />
+    );
+  }
+
+  return (
+    <div className="relative h-full bg-slate-950">
+      <StreamTheme className="relative w-full h-full bg-transparent">
+        <div className="absolute inset-0 flex items-center justify-center pb-24">
+          <SpeakerLayout />
+        </div>
+      </StreamTheme>
+
+      {/* Mute All button for teacher (non-primary band) */}
+      {isTeacher && !isPrimaryBand && (
+        <div className="absolute bottom-28 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={onMuteAll}
+            className="flex items-center gap-2"
+          >
+            <MicOff className="h-4 w-4" />
+            Mute All
+          </Button>
+        </div>
+      )}
+
+      <TranscriptionControls isTeacher={isTeacher} />
+
+      {/* Lobby admitter panel for teacher */}
+      {isTeacher && pendingUsers.length > 0 && (
+        <div className="absolute right-4 top-4 z-10">
+          <LobbyAdmitter
+            pendingUsers={pendingUsers}
+            onAdmit={onAdmit}
+            onDeny={onDeny}
+          />
+        </div>
+      )}
+
+      <FloatingControls
+        onLeave={onLeave}
+        onToggleParticipants={() => {}}
+        onToggleChat={() => {}}
+        currentLayout="spotlight"
+        onLayoutChange={() => {}}
+        isParticipantsOpen={false}
+        isChatOpen={false}
+      />
+    </div>
+  );
+}
+
 interface ClassCallRoomProps {
   callId: string;
   className: string;
   teacherName: string;
   teacherId: string;
   onLeave: () => void;
-}
-
-interface PendingUser {
-  id: string;
-  name: string;
-  streamUserId: string;
 }
 
 export function ClassCallRoom({
@@ -85,8 +212,6 @@ export function ClassCallRoom({
   onLeave,
 }: ClassCallRoomProps) {
   const { session } = useAuth();
-  const { gradeBand } = useGradeSkin();
-  const isPrimaryBand = gradeBand === "primary";
   const client = useStreamVideoClient();
   const [call, setCall] = useState<Call | null>(null);
   const [isJoining, setIsJoining] = useState(false);
@@ -101,16 +226,14 @@ export function ClassCallRoom({
       setIsJoining(true);
       try {
         const callInstance = client.call("classroom", callId);
-        
+
         if (isTeacher) {
-          // Teacher joins with create: true
           await callInstance.join({ create: true });
         } else {
-          // Student joins (will be placed in lobby)
           await callInstance.join();
           setIsInLobby(true);
         }
-        
+
         setCall(callInstance);
       } catch (err) {
         toast.error("Failed to join call");
@@ -124,28 +247,24 @@ export function ClassCallRoom({
 
     return () => {
       if (call) {
-        call.leave();
+        call.leave().catch(() => {});
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, callId, isTeacher]);
 
-  // Listen for call events
+  // Listen for lobby join events
   useEffect(() => {
     if (!call) return;
 
     const handleEvent = (event: { type: string; user?: { id: string; name?: string } }) => {
       if (event.type === "call.session_participant_joined") {
-        // Add to pending users if in lobby
         const user = event.user;
         if (isTeacher && user) {
-          setPendingUsers((prev) => [
-            ...prev,
-            {
-              id: user.id,
-              name: user.name || user.id,
-              streamUserId: user.id,
-            },
-          ]);
+          setPendingUsers((prev) => {
+            if (prev.some((u) => u.id === user.id)) return prev;
+            return [...prev, { id: user.id, name: user.name || user.id, streamUserId: user.id }];
+          });
         }
       }
     };
@@ -159,11 +278,10 @@ export function ClassCallRoom({
   const handleAdmit = async (userId: string) => {
     if (!call) return;
     try {
-      // Grant permissions to user
       await call.grantPermissions(userId, ["send-audio", "send-video"]);
       setPendingUsers((prev) => prev.filter((u) => u.id !== userId));
       toast.success("User admitted");
-    } catch (err) {
+    } catch {
       toast.error("Failed to admit user");
     }
   };
@@ -174,7 +292,7 @@ export function ClassCallRoom({
       await call.blockUser(userId);
       setPendingUsers((prev) => prev.filter((u) => u.id !== userId));
       toast.success("User removed");
-    } catch (err) {
+    } catch {
       toast.error("Failed to remove user");
     }
   };
@@ -184,7 +302,7 @@ export function ClassCallRoom({
     try {
       await call.muteAllUsers("audio");
       toast.success("All participants muted");
-    } catch (err) {
+    } catch {
       toast.error("Failed to mute all");
     }
   };
@@ -205,7 +323,6 @@ export function ClassCallRoom({
     );
   }
 
-  // Show lobby for students waiting to be admitted
   if (isInLobby && !isTeacher) {
     return (
       <Lobby
@@ -217,41 +334,17 @@ export function ClassCallRoom({
   }
 
   return (
-    <div className="relative h-full">
-      <StreamCall call={call}>
-        <div className="flex h-full">
-          <div className="relative flex-1">
-            <SpeakerLayout />
-
-            {/* EDU-T59: primary band — simplified call chrome (no bulk mute; CC remains for accessibility) */}
-            {isTeacher && !isPrimaryBand && (
-              <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2">
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleMuteAll}
-                  className="flex items-center gap-2"
-                >
-                  <MicOff className="h-4 w-4" />
-                  Mute All
-                </Button>
-              </div>
-            )}
-            <TranscriptionControls isTeacher={isTeacher} />
-          </div>
-
-          {/* Teacher sidebar with lobby */}
-          {isTeacher && (
-            <div className="absolute right-4 top-4 z-10">
-              <LobbyAdmitter
-                pendingUsers={pendingUsers}
-                onAdmit={handleAdmit}
-                onDeny={handleDeny}
-              />
-            </div>
-          )}
-        </div>
-      </StreamCall>
-    </div>
+    <StreamCall call={call}>
+      <ClassCallRoomInner
+        isTeacher={isTeacher}
+        className={className}
+        teacherName={teacherName}
+        pendingUsers={pendingUsers}
+        onAdmit={handleAdmit}
+        onDeny={handleDeny}
+        onMuteAll={handleMuteAll}
+        onLeave={onLeave}
+      />
+    </StreamCall>
   );
 }

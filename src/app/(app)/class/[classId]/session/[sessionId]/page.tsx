@@ -28,9 +28,7 @@ export default function SessionPage() {
       return;
     }
     // Admins cannot start or join classroom sessions — redirect back to the class page.
-    if (session && session.role === "admin") {
-      router.push(`/class/${classId}`);
-    }
+    if (session && session.role === "admin") router.push(`/class/${classId}`);
   }, [classData, session, router, classId]);
 
   if (classData === undefined) {
@@ -47,6 +45,29 @@ export default function SessionPage() {
         </div>
       </div>
     );
+  }
+
+  // Prevent admins from mounting `ClassCallRoom` (which would join the call and trigger mic prompts).
+  // We must wait for `session` to be resolved to avoid a race where the call mounts before the redirect.
+  if (!session) {
+    return (
+      <div className="h-screen flex flex-col">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => router.push(`/class/${classId}`)}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Class
+          </Button>
+          <div className="text-sm text-muted-foreground">Loading session…</div>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <Skeleton className="h-8 w-72" />
+        </div>
+      </div>
+    );
+  }
+
+  if (session.role === "admin") {
+    return null;
   }
 
   if (!classData) {

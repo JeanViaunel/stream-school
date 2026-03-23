@@ -9,8 +9,9 @@ import {
   Window,
   useChannelStateContext,
   useChatContext,
-  useMessageContext
+  useMessageContext,
 } from "stream-chat-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { CallButton } from "@/components/call/CallButton";
 import { CallMessageCard } from "@/components/call/CallMessage";
 import { ThreadPanel } from "./ThreadPanel";
@@ -202,6 +203,8 @@ function CustomChannelHeader() {
 function CustomMessage() {
   const { message } = useMessageContext();
   const { client } = useChatContext();
+  const { channel } = useChannelStateContext();
+  const { session } = useAuth();
 
   const callAttachment = message.attachments?.find(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -213,6 +216,7 @@ function CustomMessage() {
     const callId = (callAttachment as any).call_id as string;
     const senderName = message.user?.name || message.user?.id || "Someone";
     const isOwnMessage = message.user?.id === client.userID;
+    const canJoin = !(session?.role === "admin" && channel.type === "classroom");
 
     return (
       <div className="px-4 py-1">
@@ -220,6 +224,7 @@ function CustomMessage() {
           callId={callId}
           senderName={senderName}
           isOwnMessage={isOwnMessage}
+          canJoin={canJoin}
         />
       </div>
     );
@@ -232,8 +237,16 @@ function CustomMessage() {
 function CustomMessageList() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const { session } = useAuth();
+  const { channel } = useChannelStateContext();
+
+  const channelType =
+    (channel as unknown as { type?: string }).type ?? undefined;
+  const isAdminReadonly = session?.role === "admin" && channelType === "classroom";
 
   useEffect(() => {
+    if (isAdminReadonly) return;
+
     const handleOpenThread = (e: Event) => {
       const customEvent = e as CustomEvent;
       setActiveThreadId(customEvent.detail?.messageId || null);
@@ -241,7 +254,7 @@ function CustomMessageList() {
 
     window.addEventListener("openThread", handleOpenThread);
     return () => window.removeEventListener("openThread", handleOpenThread);
-  }, []);
+  }, [isAdminReadonly]);
 
   return (
     <div className="relative flex-1 overflow-hidden">
@@ -249,12 +262,17 @@ function CustomMessageList() {
         ref={scrollAreaRef}
         className="h-full overflow-y-auto scrollbar-thin"
       >
-        <MessageList Message={CustomMessage} />
+        <MessageList
+          Message={CustomMessage}
+          // Read-only admin: disable message actions like reply/reactions/edit/delete.
+          messageActions={isAdminReadonly ? [] : undefined}
+          disableQuotedMessages={isAdminReadonly}
+        />
       </div>
       <ScrollToBottom scrollAreaRef={scrollAreaRef} />
 
       {/* Thread panel */}
-      {activeThreadId && (
+      {!isAdminReadonly && activeThreadId && (
         <ThreadPanel
           parentMessageId={activeThreadId}
           onClose={() => setActiveThreadId(null)}
@@ -277,13 +295,28 @@ export function ChannelView() {
         markReadOnMount={settings.readReceipts}
         TypingIndicator={settings.typingIndicators ? undefined : NoopTypingIndicator}
       >
-        <Window>
-          <CustomChannelHeader />
-          <CustomMessageList />
-          <CustomMessageInput />
-        </Window>
-        <Thread />
+        <ChannelViewInner />
       </Channel>
     </div>
+  );
+}
+
+function ChannelViewInner() {
+  const { session } = useAuth();
+  const { channel } = useChannelStateContext();
+
+  const channelType =
+    (channel as unknown as { type?: string }).type ?? undefined;
+  const isAdminReadonly = session?.role === "admin" && channelType === "classroom";
+
+  return (
+    <>
+      <Window>
+        <CustomChannelHeader />
+        <CustomMessageList />
+        <CustomMessageInput />
+      </Window>
+      {!isAdminReadonly && <Thread />}
+    </>
   );
 }

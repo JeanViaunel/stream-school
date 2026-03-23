@@ -34,15 +34,17 @@ import {
   Loader2,
   MessageSquare,
   MoreVertical,
+  PhoneOff,
   UserPlus,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
 type Props = {
-  classId: Id<"classes">;
-  currentTeacherId: Id<"users">;
+  classId: Id<”classes”>;
+  currentTeacherId: Id<”users”>;
   isArchived: boolean;
+  activeSessionId?: Id<”sessions”>;
   onArchiveClass?: () => void;
   /** Hide “Class details” (e.g. when already on the details page). */
   hideClassDetailsLink?: boolean;
@@ -52,6 +54,7 @@ export function AdminClassQuickActions({
   classId,
   currentTeacherId,
   isArchived,
+  activeSessionId,
   onArchiveClass,
   hideClassDetailsLink = false,
 }: Props) {
@@ -62,6 +65,7 @@ export function AdminClassQuickActions({
   const users = useQuery(api.admin.getAllUsers, isAdmin ? {} : "skip");
   const assignTeacherToClass = useAction(api.classes.adminAssignTeacherToClass);
   const addStudentToClass = useAction(api.classes.adminAddStudentToClass);
+  const forceEndSession = useAction(api.sessions.adminForceEndSession);
 
   const [teacherDialogOpen, setTeacherDialogOpen] = useState(false);
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
@@ -69,6 +73,7 @@ export function AdminClassQuickActions({
   const [studentIdDraft, setStudentIdDraft] = useState("");
   const [assigningTeacher, setAssigningTeacher] = useState(false);
   const [addingStudent, setAddingStudent] = useState(false);
+  const [endingSession, setEndingSession] = useState(false);
 
   const teachers =
     users?.filter(
@@ -122,6 +127,20 @@ export function AdminClassQuickActions({
     }
   };
 
+  const handleForceEndSession = async () => {
+    if (!activeSessionId) return;
+    if (!confirm("Force-end the live session? All participants will be disconnected.")) return;
+    setEndingSession(true);
+    try {
+      await forceEndSession({ sessionId: activeSessionId });
+      toast.success("Session ended");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to end session");
+    } finally {
+      setEndingSession(false);
+    }
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -172,6 +191,20 @@ export function AdminClassQuickActions({
                 <span className="whitespace-nowrap">Add student</span>
               </DropdownMenuItem>
             </>
+          )}
+          {activeSessionId && (
+            <DropdownMenuItem
+              className="flex cursor-pointer items-center gap-2 text-destructive focus:text-destructive"
+              onClick={handleForceEndSession}
+              disabled={endingSession}
+            >
+              {endingSession ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              ) : (
+                <PhoneOff className="h-4 w-4 shrink-0" />
+              )}
+              <span className="whitespace-nowrap">Force end session</span>
+            </DropdownMenuItem>
           )}
           {onArchiveClass && !isArchived && (
             <DropdownMenuItem

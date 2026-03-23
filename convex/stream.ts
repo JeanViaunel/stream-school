@@ -125,6 +125,40 @@ export const addMemberToChannel = internalAction({
   },
 });
 
+// Ensures a member in a classroom channel has the desired Stream Chat channel role.
+// We use this for server-side enforcement of "admin monitor-only" behavior.
+export const setClassroomMemberChannelRole = internalAction({
+  args: {
+    channelId: v.string(),
+    streamUserId: v.string(),
+    channelRole: v.string(),
+  },
+  returns: v.null(),
+  handler: async (_ctx, { channelId, streamUserId, channelRole }) => {
+    const chatClient = StreamChat.getInstance(
+      process.env.STREAM_API_KEY!,
+      process.env.STREAM_API_SECRET!
+    );
+    const channel = chatClient.channel("classroom", channelId);
+
+    // Best-effort: assign roles first (works if user is already a member).
+    try {
+      await channel.assignRoles([
+        { channel_role: channelRole, user_id: streamUserId },
+      ]);
+      return null;
+    } catch {
+      // If the member isn't present yet, add them and retry.
+    }
+
+    await channel.addMembers([streamUserId]);
+    await channel.assignRoles([
+      { channel_role: channelRole, user_id: streamUserId },
+    ]);
+    return null;
+  },
+});
+
 export const removeMemberFromChannel = internalAction({
   args: {
     channelId: v.string(),
@@ -153,6 +187,26 @@ export const deleteMessage = internalAction({
       process.env.STREAM_API_SECRET!
     );
     await chatClient.deleteMessage(messageId);
+    return null;
+  },
+});
+
+export const endVideoCall = internalAction({
+  args: {
+    callType: v.string(),
+    callId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (_ctx, { callType, callId }) => {
+    const serverClient = new StreamClient(
+      process.env.STREAM_API_KEY!,
+      process.env.STREAM_API_SECRET!
+    );
+    try {
+      await serverClient.video.endCall({ type: callType, id: callId });
+    } catch {
+      // Best-effort: call may already be ended or never started
+    }
     return null;
   },
 });

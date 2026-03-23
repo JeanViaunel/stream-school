@@ -8,8 +8,11 @@ import {
   type Call,
 } from "@stream-io/video-react-sdk";
 import { useChatContext } from "stream-chat-react";
+import { useQuery, useAction } from "convex/react";
+import { api } from "@/../convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { CallRoom } from "@/components/call/CallRoom";
+import { CallEnded } from "@/components/call/CallEnded";
 
 interface CallPageProps {
   params: Promise<{ callId: string }>;
@@ -27,6 +30,9 @@ export default function CallPage({ params }: CallPageProps) {
   const hasJoinedRef = useRef(false);
   const chatClientRef = useRef(chatClient);
   chatClientRef.current = chatClient;
+
+  const meetingData = useQuery(api.meetings.getMeetingByStreamCallId, { streamCallId: callId });
+  const endMeeting = useAction(api.meetings.endMeeting);
 
   useEffect(() => {
     if (!videoClient) return;
@@ -129,8 +135,33 @@ export default function CallPage({ params }: CallPageProps) {
 
   const handleLeave = useCallback(() => {
     leftRef.current = true;
+    // If the host ended the call for everyone, sync the Convex meeting status
+    if (
+      meetingData &&
+      meetingData.status !== "ended" &&
+      call?.state.endedAt &&
+      session?.userId &&
+      (meetingData.hostId === session.userId || session.role === "admin")
+    ) {
+      endMeeting({ meetingId: meetingData._id }).catch(() => {});
+    }
     router.replace("/dashboard");
-  }, [router]);
+  }, [router, meetingData, call?.state.endedAt, session, endMeeting]);
+
+  // Meeting already ended — don't attempt to join; show the ended screen immediately
+  if (meetingData?.status === "ended") {
+    return (
+      <div className="h-screen">
+        <CallEnded
+          duration={0}
+          participantCount={0}
+          canRejoin={false}
+          onRejoin={() => {}}
+          onClose={() => router.replace("/meetings")}
+        />
+      </div>
+    );
+  }
 
   if (error) {
     return (

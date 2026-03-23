@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { useChatContext } from "stream-chat-react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
@@ -23,15 +23,29 @@ export default function ClassPage() {
   const classId = params.classId as string;
 
   const classData = useQuery(api.classes.getClassById, { classId: classId as Id<"classes"> });
+  const activeSession = useQuery(api.sessions.getActiveSessionForClass, { classId: classId as Id<"classes"> });
   const archiveClass = useMutation(api.classes.archiveClass);
+  const ensureAdminReadOnly = useAction(api.classes.ensureAdminReadOnlyInClassroomChat);
   const [isArchiving, setIsArchiving] = useState(false);
   const [channelReady, setChannelReady] = useState(false);
+  const [enforcedReadOnly, setEnforcedReadOnly] = useState(false);
 
   useEffect(() => {
     if (classData === null) {
       router.push("/dashboard");
     }
   }, [classData, router]);
+
+  // Server-side enforcement: when an app admin views a classroom, ensure they have
+  // read-only Stream Chat permissions for that classroom channel.
+  useEffect(() => {
+    if (!session || session.role !== "admin") return;
+    if (!classData || classData === null) return;
+    if (enforcedReadOnly) return;
+    void ensureAdminReadOnly({ classId: classData._id }).finally(() => {
+      setEnforcedReadOnly(true);
+    });
+  }, [session, classData, ensureAdminReadOnly, enforcedReadOnly]);
 
   // Load the Stream Chat channel
   useEffect(() => {
@@ -131,7 +145,8 @@ export default function ClassPage() {
               : undefined,
           }}
           enrollmentCount={classData.enrollmentCount}
-          isActiveSession={false}
+          isActiveSession={!!activeSession}
+          activeSessionId={activeSession?._id}
           onStartSession={handleStartSession}
           onJoinSession={handleJoinSession}
           onArchiveClass={handleArchiveClass}

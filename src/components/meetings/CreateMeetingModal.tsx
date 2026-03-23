@@ -16,7 +16,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, Video } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Loader2, Video, Calendar, Zap } from "lucide-react";
+
+type Mode = "instant" | "scheduled";
 
 type Props = {
   open: boolean;
@@ -27,6 +30,7 @@ export function CreateMeetingModal({ open, onOpenChange }: Props) {
   const router = useRouter();
   const { session } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<Mode>("instant");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
@@ -47,33 +51,46 @@ export function CreateMeetingModal({ open, onOpenChange }: Props) {
       return;
     }
 
-    if (!title.trim()) {
-      toast.error("Please enter a meeting title");
-      return;
+    if (mode === "scheduled") {
+      if (!title.trim()) {
+        toast.error("Please enter a meeting title");
+        return;
+      }
+      if (!scheduledAt) {
+        toast.error("Please select a date and time");
+        return;
+      }
     }
 
     setIsLoading(true);
     try {
-      const scheduled = scheduledAt
-        ? new Date(scheduledAt).getTime()
-        : undefined;
+      const resolvedTitle =
+        mode === "instant"
+          ? title.trim() ||
+            `Quick meeting · ${new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
+          : title.trim();
+
+      const scheduled =
+        mode === "scheduled" ? new Date(scheduledAt).getTime() : undefined;
 
       const result = await createMeeting({
-        title: title.trim(),
+        title: resolvedTitle,
         description: description.trim() || undefined,
         scheduledAt: scheduled,
       });
 
-      toast.success("Meeting created!");
-
-      if (!scheduled) {
+      if (mode === "instant") {
+        toast.success("Starting meeting…");
         router.push(`/call/${result.streamCallId}`);
       } else {
-        onOpenChange(false);
+        toast.success("Meeting scheduled!");
+        handleClose();
         router.push("/meetings");
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create meeting");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create meeting",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -84,13 +101,14 @@ export function CreateMeetingModal({ open, onOpenChange }: Props) {
       setTitle("");
       setDescription("");
       setScheduledAt("");
+      setMode("instant");
       onOpenChange(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Video className="h-5 w-5" />
@@ -104,71 +122,125 @@ export function CreateMeetingModal({ open, onOpenChange }: Props) {
           </p>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5 pt-2">
+        {/* Mode toggle */}
+        <div className="flex rounded-lg border border-border p-1 gap-1">
+          <button
+            type="button"
+            onClick={() => setMode("instant")}
+            disabled={isLoading}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              mode === "instant"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Zap className="h-3.5 w-3.5" />
+            Instant
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("scheduled")}
+            disabled={isLoading}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              mode === "scheduled"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Calendar className="h-3.5 w-3.5" />
+            Schedule
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Title — optional for instant, required for scheduled */}
           <div className="space-y-2">
-            <Label htmlFor="meeting-title">Title</Label>
+            <Label htmlFor="meeting-title">
+              Title{" "}
+              {mode === "instant" && (
+                <span className="text-muted-foreground font-normal">
+                  (optional)
+                </span>
+              )}
+            </Label>
             <Input
               id="meeting-title"
-              placeholder="e.g., Staff meeting, Parent–teacher conference"
+              placeholder={
+                mode === "instant"
+                  ? "Leave blank for auto-title"
+                  : "e.g., Staff meeting, Parent–teacher conference"
+              }
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               disabled={isLoading || !canCreate}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="meeting-description">
-              Description{" "}
-              <span className="text-muted-foreground font-normal">(optional)</span>
-            </Label>
-            <Textarea
-              id="meeting-description"
-              placeholder="What is this meeting about?"
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={isLoading || !canCreate}
-            />
-          </div>
+          {/* Scheduled-only fields */}
+          {mode === "scheduled" && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="meeting-description">
+                  Description{" "}
+                  <span className="text-muted-foreground font-normal">
+                    (optional)
+                  </span>
+                </Label>
+                <Textarea
+                  id="meeting-description"
+                  placeholder="What is this meeting about?"
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  disabled={isLoading || !canCreate}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="meeting-scheduled">
-              Scheduled time{" "}
-              <span className="text-muted-foreground font-normal">
-                (leave blank to start now)
-              </span>
-            </Label>
-            <Input
-              id="meeting-scheduled"
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-              disabled={isLoading || !canCreate}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="meeting-scheduled">Date &amp; time</Label>
+                <Input
+                  id="meeting-scheduled"
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  disabled={isLoading || !canCreate}
+                />
+              </div>
+            </>
+          )}
 
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end pt-1">
+          <div className="flex gap-3 pt-1">
             <Button
               type="button"
               variant="outline"
               onClick={handleClose}
               disabled={isLoading}
-              className="gap-2"
+              className="flex-1"
             >
-              <ArrowLeft className="h-4 w-4" />
               Cancel
             </Button>
 
-            <Button type="submit" disabled={isLoading || !canCreate} className="gap-2">
+            <Button
+              type="submit"
+              disabled={isLoading || !canCreate}
+              className="flex-1 gap-2"
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {scheduledAt ? "Scheduling…" : "Starting…"}
+                  {mode === "instant" ? "Starting…" : "Scheduling…"}
+                </>
+              ) : mode === "instant" ? (
+                <>
+                  <Zap className="h-4 w-4" />
+                  Start Now
                 </>
               ) : (
                 <>
-                  <Video className="h-4 w-4" />
-                  {scheduledAt ? "Schedule Meeting" : "Start Now"}
+                  <Calendar className="h-4 w-4" />
+                  Schedule
                 </>
               )}
             </Button>

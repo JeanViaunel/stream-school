@@ -7,6 +7,7 @@ import {
   SpeakerLayout,
   PaginatedGridLayout,
   useCallStateHooks,
+  useCall,
   type Call,
   CallingState
 } from "@stream-io/video-react-sdk";
@@ -64,10 +65,12 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
   const participants = useParticipants();
   const localParticipant = useLocalParticipant();
   const callingState = useCallCallingState();
+  const call = useCall();
   const [layout, setLayout] = useState<CallLayout>("spotlight");
   const [showParticipants, setShowParticipants] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showCallEnded, setShowCallEnded] = useState(false);
+  const [callEnded, setCallEnded] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [networkQuality, setNetworkQuality] = useState<
     "excellent" | "good" | "poor"
@@ -100,9 +103,11 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
   // Handle call being ended remotely (e.g. host called endCall())
   useEffect(() => {
     if (callingState === CallingState.LEFT) {
+      const wasTerminated = !!call?.state.endedAt;
+      setCallEnded(wasTerminated);
       setShowCallEnded(true);
     }
-  }, [callingState]);
+  }, [callingState, call?.state.endedAt]);
 
   // Auto-hide header after 3s - use ref to avoid re-renders
   useEffect(() => {
@@ -154,8 +159,8 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
   };
 
   const handleRejoin = () => {
+    setCallEnded(false);
     setShowCallEnded(false);
-    // Reload the page to rejoin
     window.location.reload();
   };
 
@@ -189,6 +194,7 @@ function CallRoomInner({ onLeave }: { onLeave: () => void }) {
       <CallEnded
         duration={callDuration}
         participantCount={participants.length}
+        canRejoin={!callEnded}
         onRejoin={handleRejoin}
         onClose={handleCloseCallEnded}
       />

@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MessageBubble } from "./MessageBubble";
 import { TypingIndicator } from "./TypingIndicator";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 import { X, CornerDownRight } from "lucide-react";
 import type { MessageResponse } from "stream-chat";
 
@@ -26,8 +27,14 @@ function getInitials(name: string): string {
 export function ThreadPanel({ parentMessageId, onClose }: ThreadPanelProps) {
   const { client } = useChatContext();
   const { channel } = useChannelStateContext();
+  const { session } = useAuth();
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
+
+  const channelType =
+    (channel as unknown as { type?: string }).type ?? undefined;
+  const isAdminReadonly = session?.role === "admin" && channelType === "classroom";
+  if (isAdminReadonly) return null;
 
   // Get parent message from channel state
   const parentMessage = channel.state.messages.find((m) => m.id === parentMessageId);

@@ -102,6 +102,17 @@ export const createClass = action({
       streamUserId: teacher.streamUserId,
     });
 
+    // Server-side enforcement: classroom chat is monitor-only for app admins.
+    // Stream Chat permissions are based on channel roles, so we downgrade admin
+    // users to the `guest` role inside the classroom channel.
+    if (teacher.role === "admin") {
+      await ctx.runAction(internal.stream.setClassroomMemberChannelRole, {
+        channelId: streamChannelId,
+        streamUserId: teacher.streamUserId,
+        channelRole: "guest",
+      });
+    }
+
     const classId: Id<"classes"> = await ctx.runMutation(internal.classes.insertClass, {
       organizationId: user.organizationId,
       teacherId: args.teacherId,
@@ -117,6 +128,52 @@ export const createClass = action({
       streamChannelId,
       joinCode,
     };
+  },
+});
+
+export const ensureAdminReadOnlyInClassroomChat = action({
+  args: { classId: v.id("classes") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user: {
+      _id: Id<"users">;
+      role?: string;
+      streamUserId: string;
+      organizationId?: Id<"organizations">;
+    } | null = await ctx.runQuery(internal.users.getUserByUsername, {
+      username: usernameFromIdentity(identity),
+    });
+
+    if (!user || user.role !== "admin") {
+      throw new Error("Not authorized");
+    }
+    if (!user.organizationId) {
+      throw new Error("Admin has no organization");
+    }
+
+    const cls = await ctx.runQuery(internal.classes.getClassByIdInternal, {
+      classId: args.classId,
+    });
+
+    if (!cls) {
+      throw new Error("Class not found");
+    }
+    if (cls.organizationId !== user.organizationId) {
+      throw new Error("Class not in admin organization");
+    }
+
+    await ctx.runAction(internal.stream.setClassroomMemberChannelRole, {
+      channelId: cls.streamChannelId,
+      streamUserId: user.streamUserId,
+      channelRole: "guest",
+    });
+
+    return null;
   },
 });
 
@@ -291,6 +348,15 @@ export const adminAssignTeacherToClass = action({
       channelId: cls.streamChannelId,
       streamUserId: nextTeacher.streamUserId,
     });
+
+    // Monitor-only enforcement for app admins in classroom chat.
+    if (nextTeacher.role === "admin") {
+      await ctx.runAction(internal.stream.setClassroomMemberChannelRole, {
+        channelId: cls.streamChannelId,
+        streamUserId: nextTeacher.streamUserId,
+        channelRole: "guest",
+      });
+    }
     await ctx.runAction(internal.stream.removeMemberFromChannel, {
       channelId: cls.streamChannelId,
       streamUserId: previousTeacher.streamUserId,

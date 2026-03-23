@@ -1,6 +1,7 @@
-import { internalMutation, mutation, query } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import { usernameFromIdentity } from "./authHelpers";
 
 export const updateRecordingUrl = internalMutation({
@@ -353,5 +354,123 @@ export const getSessionsByClass = query({
       .collect();
 
     return sessions;
+  },
+});
+
+export const getSessionForAdmin = internalQuery({
+  args: { sessionId: v.id("sessions") },
+  returns: v.union(
+    v.object({
+      _id: v.id("sessions"),
+      classId: v.id("classes"),
+      streamCallId: v.string(),
+      endedAt: v.optional(v.number()),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const s = await ctx.db.get(args.sessionId);
+    if (!s) return null;
+    return { _id: s._id, classId: s.classId, streamCallId: s.streamCallId, endedAt: s.endedAt };
+  },
+});
+
+export const markSessionEnded = internalMutation({
+  args: { sessionId: v.id("sessions") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.sessionId, { endedAt: Date.now() });
+    return null;
+  },
+});
+
+export const getActiveSessionForClass = query({
+  args: { classId: v.id("classes") },
+  returns: v.union(
+    v.object({
+      _id: v.id("sessions"),
+      streamCallId: v.string(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+    if (!user) throw new Error("User not found");
+
+    const cls = await ctx.db.get(args.classId);
+    if (!cls) return null;
+
+    const isTeacher = cls.teacherId === user._id;
+    const isOrgAdmin =
+      user.role === "admin" &&
+      !!user.organizationId &&
+      user.organizationId === cls.organizationId;
+    const isEnrolled = await ctx.db
+      .query("enrollments")
+      .withIndex("by_class_and_student", (q) =>
+        q.eq("classId", args.classId).eq("studentId", user._id)
+      )
+      .unique();
+
+    if (!isTeacher && !isOrgAdmin && !isEnrolled) return null;
+
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_class_and_started_at", (q) => q.eq("classId", args.classId))
+      .order("desc")
+      .first();
+
+    if (!session || session.endedAt !== undefined) return null;
+
+    return { _id: session._id, streamCallId: session.streamCallId };
+  },
+});
+
+export const adminForceEndSession = action({
+  args: { sessionId: v.id("sessions") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user: { role?: string; organizationId?: Id<"organizations"> } | null =
+      await ctx.runQuery(internal.users.getUserByUsername, {
+        username: usernameFromIdentity(identity),
+      });
+
+    if (!user || user.role !== "admin") throw new Error("Only admins can force-end sessions");
+
+    const session: {
+      _id: Id<"sessions">;
+      classId: Id<"classes">;
+      streamCallId: string;
+      endedAt?: number;
+    } | null = await ctx.runQuery(internal.sessions.getSessionForAdmin, { sessionId: args.sessionId });
+
+    if (!session) throw new Error("Session not found");
+    if (session.endedAt !== undefined) throw new Error("Session already ended");
+
+    const cls: { organizationId: Id<"organizations"> } | null = await ctx.runQuery(
+      internal.classes.getClassByIdInternal,
+      { classId: session.classId }
+    );
+    if (!cls) throw new Error("Class not found");
+    if (!user.organizationId || cls.organizationId !== user.organizationId) {
+      throw new Error("Session not in admin organization");
+    }
+
+    await ctx.runMutation(internal.sessions.markSessionEnded, { sessionId: args.sessionId });
+    await ctx.runAction(internal.stream.endVideoCall, {
+      callType: "default",
+      callId: session.streamCallId,
+    });
+
+    return null;
   },
 });

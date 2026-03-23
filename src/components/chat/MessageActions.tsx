@@ -18,6 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface MessageActionsProps {
   message: MessageResponse;
@@ -36,7 +37,13 @@ export function MessageActions({
 }: MessageActionsProps) {
   const { client } = useChatContext();
   const { channel } = useChannelStateContext();
+  const { session } = useAuth();
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
+
+  const channelType =
+    (channel as unknown as { type?: string }).type ?? undefined;
+  const isAdminReadonly = session?.role === "admin" && channelType === "classroom";
+  if (isAdminReadonly) return null;
 
   const handleReaction = useCallback(
     async (reactionType: string) => {

@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useChannelStateContext, useChatContext } from "stream-chat-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -40,6 +41,7 @@ interface MessageInputProps {
 export function CustomMessageInput({ threadParentId, placeholder }: MessageInputProps) {
   const { client } = useChatContext();
   const { channel } = useChannelStateContext();
+  const { session } = useAuth();
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [attachments, setAttachments] = useState<AttachmentPreview[]>([]);
@@ -48,6 +50,11 @@ export function CustomMessageInput({ threadParentId, placeholder }: MessageInput
 
   const channelData = channel.data as Record<string, unknown> | undefined;
   const channelName = (channelData?.name as string) || "this channel";
+
+  const channelType =
+    (channel as unknown as { type?: string }).type ?? undefined;
+  const isAdminReadonly = session?.role === "admin" && channelType === "classroom";
+  if (isAdminReadonly) return null;
 
   const handleSend = useCallback(async () => {
     if ((!text.trim() && attachments.length === 0) || isSending) return;
