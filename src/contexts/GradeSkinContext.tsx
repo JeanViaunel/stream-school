@@ -8,8 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "./AuthContext";
-
-type GradeBand = "primary" | "middle" | "high";
+import { getGradeBand, type GradeBand } from "@/lib/gradeTheme";
 
 interface GradeSkinContextValue {
   gradeBand: GradeBand;
@@ -17,13 +16,6 @@ interface GradeSkinContextValue {
 }
 
 const GradeSkinContext = createContext<GradeSkinContextValue | null>(null);
-
-function getGradeBand(gradeLevel?: number): GradeBand {
-  if (gradeLevel === undefined) return "high";
-  if (gradeLevel <= 3) return "primary";
-  if (gradeLevel <= 8) return "middle";
-  return "high";
-}
 
 export function GradeSkinProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
@@ -60,3 +52,6 @@ export function useGradeSkin() {
   if (!ctx) throw new Error("useGradeSkin must be used within GradeSkinProvider");
   return ctx;
 }
+
+export { getGradeBand, getGradeTheme, GRADE_BANDS } from "@/lib/gradeTheme";
+export type { GradeBand, GradeTheme } from "@/lib/gradeTheme";

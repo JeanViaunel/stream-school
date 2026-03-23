@@ -36,6 +36,28 @@ http.route({
       }
     }
     
+    // Handle recording webhook
+    if (body.type === "call.recording_ready") {
+      const { call_cid, filename, url } = body;
+      
+      // Store recording via internal action
+      const storeResult = await ctx.runAction(internal.recordings.storeRecording, {
+        recordingUrl: url,
+        callId: call_cid,
+        filename: filename,
+      });
+      
+      // Update session with recording URL
+      if (storeResult.success) {
+        await ctx.runMutation(internal.sessions.updateRecordingUrl, {
+          callCid: call_cid,
+          recordingUrl: storeResult.s3Url ?? url,
+        });
+      }
+      
+      return new Response("Recording processed", { status: 200 });
+    }
+    
     return new Response("OK", { status: 200 });
   }),
 });

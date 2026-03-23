@@ -90,7 +90,8 @@ export default defineSchema({
     recordingConsentRequired: v.boolean(),
   })
     .index("by_class", ["classId"])
-    .index("by_class_and_started_at", ["classId", "startedAt"]),
+    .index("by_class_and_started_at", ["classId", "startedAt"])
+    .index("by_stream_call_id", ["streamCallId"]),
 
   sessionLogs: defineTable({
     sessionId: v.id("sessions"),
@@ -138,6 +139,22 @@ export default defineSchema({
     .index("by_student", ["studentId"])
     .index("by_assignment_and_student", ["assignmentId", "studentId"]),
 
+  grades: defineTable({
+    assignmentId: v.id("assignments"),
+    studentId: v.id("users"),
+    submissionId: v.optional(v.id("submissions")),
+    score: v.number(), // 0-100 or raw points
+    maxScore: v.number(),
+    feedback: v.optional(v.string()),
+    gradedBy: v.id("users"), // teacher who assigned the grade
+    gradedAt: v.number(),
+    classId: v.id("classes"),
+  })
+    .index("by_assignment", ["assignmentId"])
+    .index("by_student", ["studentId"])
+    .index("by_class", ["classId"])
+    .index("by_assignment_and_student", ["assignmentId", "studentId"]),
+
   polls: defineTable({
     sessionId: v.id("sessions"),
     classId: v.id("classes"),
@@ -175,4 +192,18 @@ export default defineSchema({
     .index("by_organization", ["organizationId"])
     .index("by_status", ["status"])
     .index("by_message", ["messageId"]),
+
+  scheduledSessions: defineTable({
+    classId: v.id("classes"),
+    teacherId: v.id("users"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    scheduledAt: v.number(), // Unix timestamp
+    durationMinutes: v.number(), // default 60
+    icalUid: v.string(), // unique ID for iCal feeds
+    isArchived: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_class", ["classId"])
+    .index("by_class_and_scheduled_at", ["classId", "scheduledAt"]),
 });

@@ -2,6 +2,29 @@ import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
+export const updateRecordingUrl = internalMutation({
+  args: {
+    callCid: v.string(),
+    recordingUrl: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Find session by Stream call CID
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_stream_call_id", (q) => q.eq("streamCallId", args.callCid))
+      .first();
+    
+    if (session) {
+      await ctx.db.patch(session._id, { recordingUrl: args.recordingUrl });
+    } else {
+      console.warn(`Session not found for call CID: ${args.callCid}`);
+    }
+    
+    return null;
+  },
+});
+
 export const createSession = mutation({
   args: {
     classId: v.id("classes"),
