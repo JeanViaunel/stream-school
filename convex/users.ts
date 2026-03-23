@@ -1,5 +1,6 @@
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
+import { usernameFromIdentity } from "./authHelpers";
 
 /**
  * True if the user is in the org (same id) or is a legacy row with no organizationId
@@ -182,5 +183,72 @@ export const scheduleDeletion = internalMutation({
       deletionScheduledAt: at,
     });
     return null;
+  },
+});
+
+export const getMyStats = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      joinedAt: v.number(),
+      classCount: v.number(),
+      assignmentCount: v.number(),
+      sessionCount: v.number(),
+      totalHours: v.number(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", usernameFromIdentity(identity)))
+      .unique();
+
+    if (!user) return null;
+
+    // Count enrollments/classes
+    const enrollments = await ctx.db
+      .query("enrollments")
+      .withIndex("by_student", (q) => q.eq("studentId", user._id))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+
+    // Count attended sessions
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_class", (q) =>
+        q.eq("classId", enrollments[0]?.classId ?? user._id)
+      )
+      .collect();
+
+    // Calculate total hours from sessions
+    const totalMinutes = sessions.reduce((sum, s) => {
+      if (s.endedAt && s.startedAt) {
+        return sum + (s.endedAt - s.startedAt) / (1000 * 60);
+      }
+      return sum;
+    }, 0);
+
+    // Count assignments across all enrolled classes
+    let assignmentCount = 0;
+    for (const enrollment of enrollments) {
+      const assignments = await ctx.db
+        .query("assignments")
+        .withIndex("by_class", (q) => q.eq("classId", enrollment.classId))
+        .filter((q) => q.eq(q.field("isPublished"), true))
+        .collect();
+      assignmentCount += assignments.length;
+    }
+
+    return {
+      joinedAt: user.createdAt,
+      classCount: enrollments.length,
+      assignmentCount,
+      sessionCount: sessions.length,
+      totalHours: Math.round(totalMinutes / 60),
+    };
   },
 });

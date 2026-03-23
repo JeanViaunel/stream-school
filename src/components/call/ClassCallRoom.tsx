@@ -248,6 +248,25 @@ export function ClassCallRoom({
 
         if (isTeacher) {
           await callInstance.join({ create: true });
+
+          // Track who has actually joined this classroom call in the call custom
+          // state so chat call cards can correctly show "Call ended" vs "Missed call".
+          if (session?.streamUserId) {
+            try {
+              const custom = callInstance.state.custom as Record<string, unknown> | undefined;
+              const joinedParticipants = (custom?.joinedParticipants as string[] | undefined) ?? [];
+              if (!joinedParticipants.includes(session.streamUserId)) {
+                await callInstance.update({
+                  custom: {
+                    joinedParticipants: [...joinedParticipants, session.streamUserId],
+                  },
+                });
+              }
+            } catch {
+              // Best effort: don't block call join if custom state update fails.
+            }
+          }
+
           // Only create the Convex session record if one doesn't already exist for this class
           if (!activeSession) {
             await createSession({
@@ -315,7 +334,23 @@ export function ClassCallRoom({
 
     const myStreamUserId = client?.user?.id;
 
-    const handleEvent = (event: {
+    const markJoined = async (streamUserId: string) => {
+      try {
+        const custom = call.state.custom as Record<string, unknown> | undefined;
+        const joinedParticipants = (custom?.joinedParticipants as string[] | undefined) ?? [];
+        if (!joinedParticipants.includes(streamUserId)) {
+          await call.update({
+            custom: {
+              joinedParticipants: [...joinedParticipants, streamUserId],
+            },
+          });
+        }
+      } catch {
+        // Best effort: custom state might fail if the call custom isn't initialized yet.
+      }
+    };
+
+    const handleEvent = async (event: {
       type: string;
       custom?: { type?: string; streamUserId?: string };
     }) => {
@@ -325,11 +360,18 @@ export function ClassCallRoom({
         event.custom?.type === "student-admitted" &&
         event.custom?.streamUserId === myStreamUserId
       ) {
+        const streamUserIdToMark = event.custom.streamUserId;
+        if (streamUserIdToMark) {
+          await markJoined(streamUserIdToMark);
+        }
         setIsInLobby(false);
         return;
       }
       // Fallback: permissions_updated (fires if call type restricts permissions by default)
       if (event.type === "call.permissions_updated") {
+        if (myStreamUserId) {
+          await markJoined(myStreamUserId);
+        }
         setIsInLobby(false);
       }
     };

@@ -10,8 +10,11 @@ import { Sidebar } from "@/components/chat/Sidebar";
 import { IncomingCallModal } from "@/components/call/IncomingCallModal";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NotificationManager } from "@/components/NotificationManager";
+import { MobileNav } from "@/components/navigation/MobileNav";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GradeSkin } from "@/components/ui/GradeSkin";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 
 function AppLoadingScreen() {
   return (
@@ -43,6 +46,28 @@ function AppLoadingScreen() {
   );
 }
 
+// Inner component that has access to all providers
+function AppContent({ children }: { children: ReactNode }) {
+  // Initialize keyboard shortcuts and desktop notifications
+  useKeyboardShortcuts();
+  useDesktopNotifications();
+  
+  return (
+    <GradeSkin className="flex h-full min-h-0 w-full flex-col">
+      <CommandPalette />
+      <IncomingCallModal />
+      <NotificationManager />
+      <div className="flex h-screen min-h-0">
+        <div className="hidden md:block">
+          <Sidebar />
+        </div>
+        <main className="flex-1 overflow-auto pb-16 md:pb-0">{children}</main>
+      </div>
+      <MobileNav />
+    </GradeSkin>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const router = useRouter();
@@ -61,15 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <SettingsProvider>
       <UIActionsProvider>
         <StreamContext>
-          <GradeSkin className="flex h-full min-h-0 w-full flex-col">
-            <CommandPalette />
-            <IncomingCallModal />
-            <NotificationManager />
-            <div className="flex h-screen min-h-0">
-              <Sidebar />
-              <main className="flex-1 overflow-auto">{children}</main>
-            </div>
-          </GradeSkin>
+          <AppContent>{children}</AppContent>
         </StreamContext>
       </UIActionsProvider>
     </SettingsProvider>

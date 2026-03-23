@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStreamVideoClient, useCalls, CallingState } from "@stream-io/video-react-sdk";
-import { useChannelStateContext, useChatContext } from "stream-chat-react";
+import { useChannelStateContext } from "stream-chat-react";
 import { Video, PhoneCall } from "lucide-react";
 import {
   Tooltip,
@@ -13,20 +13,32 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAction } from "convex/react";
+import { api } from "@/../convex/_generated/api";
+import { toast } from "sonner";
 
 export function CallButton() {
   const router = useRouter();
   const { session } = useAuth();
   const videoClient = useStreamVideoClient();
   const { channel } = useChannelStateContext();
-  const { client: chatClient } = useChatContext();
   const [loading, setLoading] = useState(false);
 
   const channelData = channel.data as Record<string, unknown> | undefined;
   const activeCallId = channelData?.active_call_id as string | undefined;
 
+  const authorizeClassroomCallStart = useAction(api.classes.authorizeClassroomCallStart);
+
+  const isClassroomChannel = channel.type === "classroom";
+  const canStartInClassroom = session?.role === "teacher" || session?.role === "co_teacher";
+
   // Admins cannot start or join calls in classroom channels.
-  if (session?.role === "admin" && channel.type === "classroom") {
+  if (isClassroomChannel && session?.role === "admin") {
+    return null;
+  }
+
+  // Students/parents/etc. can only join ongoing calls (if any).
+  if (isClassroomChannel && !canStartInClassroom && !activeCallId) {
     return null;
   }
 
@@ -41,6 +53,10 @@ export function CallButton() {
 
     setLoading(true);
     try {
+      if (isClassroomChannel) {
+        await authorizeClassroomCallStart({ streamChannelId: channel.id });
+      }
+
       const raw = `${channel.id}-${Date.now()}`;
       const hashBuffer = await crypto.subtle.digest(
         "SHA-256",
@@ -82,6 +98,9 @@ export function CallButton() {
       router.push(`/call/${callId}`);
     } catch (err) {
       console.error("Failed to start call:", err);
+      if (isClassroomChannel) {
+        toast.error("You are not allowed to start this classroom call");
+      }
     } finally {
       setLoading(false);
     }
@@ -122,7 +141,11 @@ export function CallButton() {
           )}
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          {isInCall ? "In call" : hasActiveCall ? "Join ongoing call" : "Start video call"}
+          {isInCall
+            ? "In call"
+            : hasActiveCall
+              ? "Join ongoing call"
+              : "Start video call"}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

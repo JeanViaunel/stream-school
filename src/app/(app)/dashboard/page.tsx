@@ -24,6 +24,7 @@ import {
 import { CalendarView } from "@/components/schedule/CalendarView";
 import { CreateClassModal } from "@/components/class/CreateClassModal";
 import { CreateMeetingModal } from "@/components/meetings/CreateMeetingModal";
+import { UpNextCard } from "@/components/dashboard/UpNextCard";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -53,6 +54,16 @@ export default function DashboardPage() {
   const studentClasses = useQuery(
     api.classes.getClassesByStudent,
     session?.role === "student" ? {} : "skip"
+  );
+
+  const upcomingSessions = useQuery(
+    api.schedule.getUpcoming,
+    session?.role === "student" ? { days: 7 } : "skip"
+  );
+
+  const upcomingAssignments = useQuery(
+    api.assignments.getMyUpcomingAssignments,
+    session?.role === "student" ? { limit: 5 } : "skip"
   );
 
   const enrollByJoinCode = useAction(api.classes.enrollByJoinCode);
@@ -100,6 +111,8 @@ export default function DashboardPage() {
 
   // Role-specific dashboards
   if (session.role === "student") {
+    const isLoadingUpNext = upcomingSessions === undefined || upcomingAssignments === undefined;
+    
     return (
       <div className="w-full px-4 md:px-6 py-6">
         <header className="mb-8">
@@ -107,9 +120,18 @@ export default function DashboardPage() {
             Welcome back, {session.displayName}!
           </h1>
           <p className="text-muted-foreground">
-            Here are your classes for today
+            Here is what you need to focus on today
           </p>
         </header>
+
+        {/* Up Next Section - Priority focus area */}
+        <div className="mb-8">
+          <UpNextCard 
+            sessions={upcomingSessions} 
+            assignments={upcomingAssignments} 
+            isLoading={isLoadingUpNext}
+          />
+        </div>
 
         <div className="mb-8">
           <CalendarView />
@@ -121,7 +143,11 @@ export default function DashboardPage() {
           aria-label="My classes"
         >
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-          {studentClasses?.map((cls) => (
+          {studentClasses?.map((cls) => {
+            const nextSession = upcomingSessions?.find(s => s.classId === cls._id);
+            const sessionCount = upcomingSessions?.filter(s => s.classId === cls._id).length || 0;
+            
+            return (
             <Link key={cls._id} href={`/class/${cls._id}`}>
               <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                 <CardHeader className="pb-3">
@@ -144,14 +170,22 @@ export default function DashboardPage() {
                   )}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">
-                      No upcoming sessions
+                      {nextSession ? (
+                        <span className="flex items-center gap-1">
+                          <Video className="w-3 h-3" />
+                          {sessionCount > 1 ? `${sessionCount} upcoming sessions` : nextSession.title}
+                        </span>
+                      ) : (
+                        "No upcoming sessions"
+                      )}
                     </span>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </div>
                 </CardContent>
               </Card>
             </Link>
-          ))}
+            );
+          })}
 
           {/* Join class card */}
           <Dialog open={showJoinDialog} onOpenChange={setShowJoinDialog}>

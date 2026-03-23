@@ -1,6 +1,5 @@
 "use client";
 
-import { Sidebar } from "@/components/chat/Sidebar";
 import { Separator } from "@/components/ui/separator";
 
 interface ShortcutGroup {
@@ -13,21 +12,34 @@ interface ShortcutGroup {
 
 const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
-    title: "Navigation",
+    title: "Quick Navigation",
+    shortcuts: [
+      { keys: ["G"], description: "Go to... (press twice for actions)" },
+      { keys: ["G", "D"], description: "Go to Dashboard" },
+      { keys: ["G", "A"], description: "Go to Assignments (students)" },
+      { keys: ["G", "M"], description: "Go to Messages" },
+      { keys: ["N"], description: "New direct message" },
+      { keys: ["?"], description: "Show this help" },
+    ],
+  },
+  {
+    title: "Global",
     shortcuts: [
       { keys: ["⌘", "K"], description: "Open command palette" },
-      { keys: ["⌘", "N"], description: "New direct message" },
-      { keys: ["⌘", "G"], description: "New group chat" },
+      { keys: ["⌘", "/"], description: "Search everywhere" },
       { keys: ["⌘", ","], description: "Open settings" },
+      { keys: ["⌘", "P"], description: "Go to profile" },
+      { keys: ["Esc"], description: "Close modal / Cancel" },
     ],
   },
   {
     title: "Calls",
     shortcuts: [
-      { keys: ["⌘", "V"], description: "Start video call" },
+      { keys: ["⌘", "V"], description: "Start/join video call" },
       { keys: ["⌘", "D"], description: "Toggle microphone" },
       { keys: ["⌘", "E"], description: "Toggle camera" },
       { keys: ["⌘", "⇧", "L"], description: "Leave call" },
+      { keys: ["M"], description: "Mute/unmute (during call)" },
     ],
   },
   {
@@ -36,14 +48,18 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["Enter"], description: "Send message" },
       { keys: ["⇧", "Enter"], description: "New line in message" },
       { keys: ["↑"], description: "Edit last message" },
-      { keys: ["Esc"], description: "Cancel editing / close dialog" },
+      { keys: ["/"], description: "Search in conversation" },
+      { keys: ["R"], description: "Reply to message" },
     ],
   },
   {
-    title: "App",
+    title: "Classroom",
     shortcuts: [
-      { keys: ["⌘", "⇧", "Q"], description: "Log out" },
-      { keys: ["⌘", "/"], description: "Show keyboard shortcuts" },
+      { keys: ["1"], description: "Switch to Overview tab" },
+      { keys: ["2"], description: "Switch to Chat tab" },
+      { keys: ["3"], description: "Switch to Grades tab" },
+      { keys: ["4"], description: "Switch to Sessions tab" },
+      { keys: ["J"], description: "Join live session" },
     ],
   },
 ];
@@ -58,10 +74,8 @@ function Key({ label }: { label: string }) {
 
 export default function KeyboardShortcutsPage() {
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-        <div className="max-w-2xl w-full mx-auto px-8 py-10">
+    <div className="w-full px-4 sm:px-8 py-6 sm:py-10">
+      <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <h1
@@ -102,7 +116,7 @@ export default function KeyboardShortcutsPage() {
             ))}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

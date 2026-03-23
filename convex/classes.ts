@@ -162,6 +162,69 @@ export const ensureAdminReadOnlyInClassroomChat = action({
   },
 });
 
+function isTeacherRole(role: string | undefined): boolean {
+  return role === "teacher" || role === "co_teacher";
+}
+
+const classByStreamChannelIdInternalValidator = v.union(
+  v.object({
+    _id: v.id("classes"),
+    teacherId: v.id("users"),
+    isArchived: v.boolean(),
+  }),
+  v.null(),
+);
+
+export const getClassByStreamChannelIdInternal = internalQuery({
+  args: { streamChannelId: v.string() },
+  returns: classByStreamChannelIdInternalValidator,
+  handler: async (ctx, args) => {
+    const cls = await ctx.db
+      .query("classes")
+      .withIndex("by_stream_channel_id", (q) =>
+        q.eq("streamChannelId", args.streamChannelId),
+      )
+      .unique();
+    if (!cls) return null;
+
+    return { _id: cls._id, teacherId: cls.teacherId, isArchived: cls.isArchived };
+  },
+});
+
+export const authorizeClassroomCallStart = action({
+  args: { streamChannelId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user: {
+      _id: Id<"users">;
+      role?: string;
+    } | null = await ctx.runQuery(internal.users.getUserByUsername, {
+      username: usernameFromIdentity(identity),
+    });
+
+    if (!user) throw new Error("User not found");
+    if (!isTeacherRole(user.role)) {
+      throw new Error("Only teachers can start classroom calls");
+    }
+
+    const cls = await ctx.runQuery(internal.classes.getClassByStreamChannelIdInternal, {
+      streamChannelId: args.streamChannelId,
+    });
+
+    if (!cls) throw new Error("Class not found");
+    if (cls.isArchived) throw new Error("This class is archived");
+
+    if (cls.teacherId !== user._id) {
+      throw new Error("Only the assigned class teacher can start classroom calls");
+    }
+
+    return null;
+  },
+});
+
 async function requireAdminOrg(ctx: ActionCtx): Promise<{
   adminUser: { _id: Id<"users">; organizationId: Id<"organizations"> };
   orgId: Id<"organizations">;

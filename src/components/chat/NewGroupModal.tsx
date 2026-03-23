@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import type { Session } from "@/lib/session";
 import {
   X,
   Users,
@@ -40,6 +41,23 @@ function initials(name: string): string {
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function roleLabel(role: Session["role"] | undefined): string {
+  switch (role) {
+    case "student":
+      return "Student";
+    case "teacher":
+      return "Teacher";
+    case "co_teacher":
+      return "Co-teacher";
+    case "parent":
+      return "Parent";
+    case "admin":
+      return "Admin";
+    default:
+      return "—";
+  }
 }
 
 export function NewGroupModal({ onClose }: NewGroupModalProps) {
@@ -194,7 +212,7 @@ export function NewGroupModal({ onClose }: NewGroupModalProps) {
               {/* Avatar Upload Placeholder */}
               <div className="flex justify-center">
                 <div className="relative group cursor-pointer">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border-2 border-dashed border-primary/30 flex items-center justify-center transition-all duration-200 group-hover:border-primary/50 group-hover:from-primary/30 group-hover:to-primary/10">
+                  <div className="w-20 h-20 rounded-2xl bg-linear-to-br from-primary/20 to-primary/5 border-2 border-dashed border-primary/30 flex items-center justify-center transition-all duration-200 group-hover:border-primary/50 group-hover:from-primary/30 group-hover:to-primary/10">
                     <Users className="h-8 w-8 text-primary/60" />
                   </div>
                   <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-lg">
@@ -318,7 +336,7 @@ export function NewGroupModal({ onClose }: NewGroupModalProps) {
               {/* Group Preview */}
               <div className="p-4 bg-secondary/30 rounded-xl border border-border/50">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-xl bg-linear-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center">
                     <Users className="h-7 w-7 text-primary/70" />
                   </div>
                   <div>
@@ -345,9 +363,9 @@ export function NewGroupModal({ onClose }: NewGroupModalProps) {
                     </Avatar>
                     <div className="flex-1">
                       <p className="text-sm font-medium">{session?.displayName} (You)</p>
-                      <p className="text-xs text-muted-foreground">@{session?.streamUserId}</p>
+                      <p className="text-xs text-muted-foreground">{roleLabel(session?.role)}</p>
                     </div>
-                    <Badge variant="outline" className="text-xs">Admin</Badge>
+                    <Badge variant="outline" className="text-xs">{roleLabel(session?.role)}</Badge>
                   </div>
                   
                   {selected.map((user) => (

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useAction } from "convex/react";
 import { api } from "@/../convex/_generated/api";
-import { Sidebar } from "@/components/chat/Sidebar";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -153,10 +152,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-        <div className="max-w-2xl w-full mx-auto px-8 py-10">
+    <div className="w-full px-4 sm:px-8 py-6 sm:py-10">
+      <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <h1
@@ -289,7 +286,7 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

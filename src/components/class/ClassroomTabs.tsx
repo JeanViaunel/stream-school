@@ -10,47 +10,93 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Gradebook } from "@/components/gradebook/Gradebook";
+import { ClassOverview } from "./ClassOverview";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
-import { ExternalLink, Video } from "lucide-react";
+import { ExternalLink, Video, LayoutDashboard, MessageSquare, GraduationCap, Calendar } from "lucide-react";
 
 interface ClassroomTabsProps {
   classId: Id<"classes">;
   teacherId: Id<"users">;
   chatPanel: ReactNode;
+  className?: string;
+  teacherDisplayName?: string;
+  enrollmentCount?: number;
 }
 
-export function ClassroomTabs({ classId, teacherId, chatPanel }: ClassroomTabsProps) {
+export function ClassroomTabs({ classId, teacherId, chatPanel, className = "Class", teacherDisplayName, enrollmentCount = 0 }: ClassroomTabsProps) {
   const { session } = useAuth();
   const sessions = useQuery(api.sessions.getSessionsByClass, { classId });
   const myGrades = useQuery(
     api.grades.getMyGrades,
     session?.role === "student" ? { classId } : "skip"
   );
+  
+  // Get upcoming scheduled sessions
+  const scheduledSessions = useQuery(
+    api.schedule.getSessionsByClass,
+    { classId }
+  );
+  
+  // Get assignments for this class
+  const assignments = useQuery(
+    api.assignments.getAssignmentsByClass,
+    { classId }
+  );
 
   const isTeacherOrAdmin =
     session?.userId === teacherId ||
     session?.role === "admin";
+    
+  const isStudent = session?.role === "student";
 
   if (!session) {
     return null;
   }
+  
+  // Filter upcoming sessions (not ended)
+  const now = Date.now();
+  const upcomingSessions = scheduledSessions?.filter(
+    s => s.scheduledAt + (s.durationMinutes * 60 * 1000) > now
+  ) || [];
 
   return (
-    <Tabs defaultValue="chat" className="flex min-h-0 flex-1 flex-col">
+    <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col">
       <div className="border-t border-border bg-card px-4 pt-3">
         <TabsList className="w-full justify-start gap-1 bg-transparent p-0">
-          <TabsTrigger value="chat" className="rounded-md px-4">
-            Chat
+          <TabsTrigger value="overview" className="rounded-md px-3 flex items-center gap-1.5">
+            <LayoutDashboard className="h-4 w-4" />
+            <span className="hidden sm:inline">Overview</span>
           </TabsTrigger>
-          <TabsTrigger value="grades" className="rounded-md px-4">
-            {isTeacherOrAdmin ? "Gradebook" : "My grades"}
+          <TabsTrigger value="chat" className="rounded-md px-3 flex items-center gap-1.5">
+            <MessageSquare className="h-4 w-4" />
+            <span className="hidden sm:inline">Chat</span>
           </TabsTrigger>
-          <TabsTrigger value="sessions" className="rounded-md px-4">
-            Past sessions
+          <TabsTrigger value="grades" className="rounded-md px-3 flex items-center gap-1.5">
+            <GraduationCap className="h-4 w-4" />
+            <span className="hidden sm:inline">{isTeacherOrAdmin ? "Gradebook" : "Grades"}</span>
+          </TabsTrigger>
+          <TabsTrigger value="sessions" className="rounded-md px-3 flex items-center gap-1.5">
+            <Calendar className="h-4 w-4" />
+            <span className="hidden sm:inline">Sessions</span>
           </TabsTrigger>
         </TabsList>
       </div>
+
+      <TabsContent
+        value="overview"
+        className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden"
+      >
+        <ClassOverview
+          classId={classId}
+          className={className}
+          teacherName={teacherDisplayName}
+          upcomingSessions={upcomingSessions}
+          assignments={assignments || []}
+          enrollmentCount={enrollmentCount}
+          isLoading={scheduledSessions === undefined || assignments === undefined}
+        />
+      </TabsContent>
 
       <TabsContent
         value="chat"

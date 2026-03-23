@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatContext } from "stream-chat-react";
 import { toast } from "sonner";
+import type { Session } from "@/lib/session";
 import {
   LogOut,
   Settings,
@@ -46,6 +47,23 @@ function initials(name: string): string {
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function roleLabel(role: Session["role"] | undefined): string {
+  switch (role) {
+    case "student":
+      return "Student";
+    case "teacher":
+      return "Teacher";
+    case "co_teacher":
+      return "Co-teacher";
+    case "parent":
+      return "Parent";
+    case "admin":
+      return "Admin";
+    default:
+      return "—";
+  }
 }
 
 /** Stream `UserResponse` typings omit `status` in some versions; it exists at runtime. */
@@ -110,7 +128,7 @@ export function UserMenu({ onLogout }: UserMenuProps) {
                 {session?.displayName ?? "—"}
               </p>
               <p className="truncate text-[11px] text-muted-foreground">
-                @{session?.streamUserId ?? "—"}
+                {roleLabel(session?.role)}
               </p>
             </div>
           </div>
@@ -136,7 +154,7 @@ export function UserMenu({ onLogout }: UserMenuProps) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm truncate">{session?.displayName ?? "—"}</p>
-              <p className="text-xs text-muted-foreground truncate">@{session?.streamUserId ?? "—"}</p>
+              <p className="text-xs text-muted-foreground truncate">{roleLabel(session?.role)}</p>
               <div className="flex items-center gap-1.5 mt-1">
                 <StatusIcon className={`h-3 w-3 ${currentStatus.color}`} />
                 <span className="text-xs text-muted-foreground">{currentStatus.label}</span>

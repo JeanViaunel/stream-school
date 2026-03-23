@@ -39,6 +39,7 @@ import {
   ChevronDown,
   ChevronRight,
   Video,
+  FileText,
 } from "lucide-react";
 import {
   ContextMenu,
@@ -54,6 +55,7 @@ import { UserMenu } from "./UserMenu";
 import { ChannelItem } from "./ChannelItem";
 import { SearchBar } from "./SearchBar";
 import { SectionHeader } from "./SectionHeader";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { cn } from "@/lib/utils";
 import type { Channel } from "stream-chat";
 
@@ -296,17 +298,20 @@ export function Sidebar() {
   
   return (
     <TooltipProvider>
-      <aside className="flex w-72 shrink-0 flex-col border-r border-border/60 bg-sidebar relative">
+      <aside className="flex w-72 shrink-0 flex-col h-full min-h-0 border-r border-border/60 bg-sidebar relative">
         {/* ── Header ── */}
-        <div className="flex items-center gap-2.5 px-4 py-4 border-b border-border/60">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-primary/30 bg-primary/12 shadow-glow">
-            <span className="text-sm font-bold text-primary" style={{ fontFamily: "var(--font-syne)" }}>
-              S
+        <div className="flex items-center justify-between px-4 py-4 border-b border-border/60">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-primary/30 bg-primary/12 shadow-glow">
+              <span className="text-sm font-bold text-primary" style={{ fontFamily: "var(--font-syne)" }}>
+                S
+              </span>
+            </div>
+            <span className="text-sm font-bold tracking-tight gradient-text" style={{ fontFamily: "var(--font-syne)" }}>
+              StreamSchool
             </span>
           </div>
-          <span className="text-sm font-bold tracking-tight gradient-text" style={{ fontFamily: "var(--font-syne)" }}>
-            StreamSchool
-          </span>
+          <NotificationBell />
         </div>
 
         {/* ── Main Navigation ── */}
@@ -396,6 +401,21 @@ export function Sidebar() {
                 )}>
                   <Video className="h-4 w-4" />
                   <span>Meetings</span>
+                </div>
+              </Link>
+            )}
+
+            {/* Assignments link (students only) */}
+            {session?.role === "student" && (
+              <Link href="/assignments">
+                <div className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer",
+                  pathname === "/assignments"
+                    ? "bg-primary/10 text-primary"
+                    : "text-foreground hover:bg-muted",
+                )}>
+                  <FileText className="h-4 w-4" />
+                  <span>Assignments</span>
                 </div>
               </Link>
             )}
@@ -577,7 +597,7 @@ export function Sidebar() {
         </ScrollArea>
 
         {/* ── User Card ── */}
-        <div className="border-t border-border/60 p-3">
+        <div className="border-t border-border/60 p-3 mt-auto">
           <UserMenu onLogout={() => setShowLogoutConfirm(true)} />
         </div>
 

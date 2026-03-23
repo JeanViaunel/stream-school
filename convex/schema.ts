@@ -18,6 +18,7 @@ export default defineSchema({
     organizationId: v.optional(v.id("organizations")),
     gradeLevel: v.optional(v.number()),
     avatarUrl: v.optional(v.string()),
+    bio: v.optional(v.string()),
     parentConsentGiven: v.optional(v.boolean()),
     parentConsentAt: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
@@ -56,6 +57,7 @@ export default defineSchema({
   })
     .index("by_organization", ["organizationId"])
     .index("by_teacher", ["teacherId"])
+    .index("by_stream_channel_id", ["streamChannelId"])
     .index("by_join_code", ["joinCode"]),
 
   enrollments: defineTable({
@@ -240,4 +242,28 @@ export default defineSchema({
   })
     .index("by_organization", ["organizationId"])
     .index("by_organization_and_created_at", ["organizationId", "createdAt"]),
+
+  notifications: defineTable({
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("announcement"),
+      v.literal("grade"),
+      v.literal("session_reminder"),
+      v.literal("mention"),
+      v.literal("assignment")
+    ),
+    title: v.string(),
+    message: v.string(),
+    read: v.boolean(),
+    link: v.optional(v.string()),
+    metadata: v.optional(v.object({
+      classId: v.optional(v.id("classes")),
+      assignmentId: v.optional(v.id("assignments")),
+      sessionId: v.optional(v.id("sessions")),
+    })),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_read", ["userId", "read"])
+    .index("by_user_created", ["userId", "createdAt"]),
 });

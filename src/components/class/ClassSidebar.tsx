@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGradeSkin } from "@/contexts/GradeSkinContext";
+import { useUnreadCounts } from "@/hooks/useUnreadCounts";
 import { 
   Plus, 
   BookOpen, 
@@ -20,7 +21,6 @@ import {
   Globe, 
   Music, 
   Dumbbell,
-  MessageCircle,
   Hash
 } from "lucide-react";
 
@@ -82,7 +82,8 @@ export function ClassSidebar() {
   const { session } = useAuth();
   const { gradeBand } = useGradeSkin();
   const pathname = usePathname();
-  
+  const { getUnreadCount } = useUnreadCounts();
+
   // Teachers/co-teachers: classes they lead. Admins: all org classes (not only where they are teacherId).
   const teacherClasses = useQuery(
     api.classes.getClassesByTeacher,
@@ -115,7 +116,7 @@ export function ClassSidebar() {
       acc[subject].push(cls as Class);
       return acc;
     }, {} as Record<string, Class[]>);
-    
+
     return grouped;
   }, [session?.role, adminOrgClasses, teacherClasses, studentClasses]);
 
@@ -138,7 +139,7 @@ export function ClassSidebar() {
             </Link>
           )}
         </div>
-        
+
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-2">
             {Object.entries(classes).map(([subject, subjectClasses]) => (
@@ -147,7 +148,8 @@ export function ClassSidebar() {
                   const Icon = subjectIcons[subject] || subjectIcons.default;
                   const color = getClassColor(cls._id);
                   const isActive = pathname === `/class/${cls._id}`;
-                  
+                  const unreadCount = getUnreadCount(cls.streamChannelId);
+
                   return (
                     <Link key={cls._id} href={`/class/${cls._id}`}>
                       <motion.div
@@ -161,10 +163,11 @@ export function ClassSidebar() {
                       >
                         <Icon className="w-6 h-6" style={{ color }} />
                         {/* Unread indicator dot */}
-                        <span 
-                          className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card"
-                          style={{ backgroundColor: color }}
-                        />
+                        {unreadCount > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full border-2 border-card bg-destructive text-[10px] font-bold text-destructive-foreground flex items-center justify-center">
+                            {unreadCount > 9 ? "9+" : unreadCount}
+                          </span>
+                        )}
                       </motion.div>
                     </Link>
                   );
@@ -192,7 +195,7 @@ export function ClassSidebar() {
           </Link>
         )}
       </div>
-      
+
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-4">
           {Object.entries(classes).length === 0 ? (
@@ -206,7 +209,7 @@ export function ClassSidebar() {
           ) : (
             Object.entries(classes).map(([subject, subjectClasses]) => {
               const Icon = subjectIcons[subject] || subjectIcons.default;
-              
+
               return (
                 <div key={subject}>
                   <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2 mb-2 flex items-center gap-1.5">
@@ -217,7 +220,8 @@ export function ClassSidebar() {
                     {subjectClasses.map((cls) => {
                       const color = getClassColor(cls._id);
                       const isActive = pathname === `/class/${cls._id}`;
-                      
+                      const unreadCount = getUnreadCount(cls.streamChannelId);
+
                       return (
                         <Link key={cls._id} href={`/class/${cls._id}`}>
                           <motion.div
@@ -228,7 +232,7 @@ export function ClassSidebar() {
                               ${isActive ? "bg-primary/10 text-primary" : "hover:bg-muted"}
                             `}
                           >
-                            <span 
+                            <span
                               className="w-2.5 h-2.5 rounded-full shrink-0"
                               style={{ backgroundColor: color }}
                             />
@@ -240,17 +244,14 @@ export function ClassSidebar() {
                                 </p>
                               )}
                             </div>
-                            {/* Unread badge - placeholder */}
-                            {gradeBand === "high" && (
-                              <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5">
-                                0
+                            {/* Unread badge */}
+                            {unreadCount > 0 && gradeBand === "high" && (
+                              <Badge variant="destructive" className="text-xs px-1.5 py-0 h-5 min-w-5 flex items-center justify-center">
+                                {unreadCount > 99 ? "99+" : unreadCount}
                               </Badge>
                             )}
-                            {gradeBand === "middle" && (
-                              <span 
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: color }}
-                              />
+                            {unreadCount > 0 && gradeBand === "middle" && (
+                              <span className="w-2.5 h-2.5 rounded-full bg-destructive shrink-0" />
                             )}
                           </motion.div>
                         </Link>
@@ -263,7 +264,7 @@ export function ClassSidebar() {
           )}
         </div>
       </ScrollArea>
-      
+
       {/* Join code input for students */}
       {!isTeacherLike && (
         <div className="p-3 border-t border-border">

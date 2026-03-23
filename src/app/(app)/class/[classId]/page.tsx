@@ -171,6 +171,9 @@ export default function ClassPage() {
               classId={classData._id}
               teacherId={classData.teacherId}
               chatPanel={<ChannelView />}
+              className={classData.name}
+              teacherDisplayName={classData.teacher?.displayName}
+              enrollmentCount={classData.enrollmentCount}
             />
           ) : (
             <div className="flex h-full items-center justify-center">

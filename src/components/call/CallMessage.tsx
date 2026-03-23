@@ -16,6 +16,12 @@ function formatDuration(seconds: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+function formatEndedAtHHmm(endedAt: unknown): string | undefined {
+  const ms = new Date(endedAt as Date | string | number).getTime();
+  if (!Number.isFinite(ms)) return undefined;
+  return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 interface CallMessageCardProps {
   callId: string;
   senderName: string;
@@ -36,17 +42,27 @@ export function CallMessageCard({
     "loading"
   );
   const [duration, setDuration] = useState<number | undefined>();
+  const [endedAtTime, setEndedAtTime] = useState<string | undefined>();
   const [wasParticipant, setWasParticipant] = useState(false);
 
   useEffect(() => {
     if (!videoClient) return;
     let cancelled = false;
+    const call = videoClient.call("default", callId);
+
+    // This component only needs the call's status (e.g. `endedAt`) to render a
+    // message card. We must avoid triggering camera/mic device acquisition.
+    call.camera.disable().catch(() => {});
+    call.microphone.disable().catch(() => {});
+
+    let endedDetected = false;
+    let interval: ReturnType<typeof setInterval> | undefined;
 
     const checkStatus = async () => {
       try {
-        const call = videoClient.call("default", callId);
         await call.get();
         if (cancelled) return;
+        if (endedDetected) return;
 
         if (call.state.endedAt) {
           const joinedParticipants = (
@@ -67,14 +83,24 @@ export function CallMessageCard({
             setDuration(Math.floor(ms / 1000));
           }
 
+          setEndedAtTime(formatEndedAtHHmm(endedAt));
           setStatus("ended");
+          endedDetected = true;
+          if (interval) clearInterval(interval);
         } else {
           setStatus("active");
-        }
-      } catch {
-        if (!cancelled) {
-          setStatus("ended");
           setWasParticipant(false);
+          setDuration(undefined);
+          setEndedAtTime(undefined);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          // Avoid breaking the UI when the SDK can't access devices during a
+          // status probe. Default to "active" so users can still join.
+          setStatus("active");
+          setWasParticipant(isOwnMessage);
+          setDuration(undefined);
+          setEndedAtTime(undefined);
         }
       }
     };
@@ -83,11 +109,11 @@ export function CallMessageCard({
     checkStatus();
 
     // Poll every 5 s so the Join button disables as soon as the call ends
-    const interval = setInterval(checkStatus, 5000);
+    interval = setInterval(checkStatus, 5000);
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
     };
   }, [callId, videoClient, chatClient.userID, isOwnMessage]);
 
@@ -112,6 +138,9 @@ export function CallMessageCard({
             {duration !== undefined && (
               <p className="text-xs text-white/40">{formatDuration(duration)}</p>
             )}
+            {endedAtTime && (
+              <p className="text-[10px] text-white/40">Ended at {endedAtTime}</p>
+            )}
           </div>
         </div>
       );
@@ -125,6 +154,9 @@ export function CallMessageCard({
         <div>
           <p className="text-sm font-medium text-white/80">Missed call</p>
           <p className="text-xs text-white/40">from {senderName}</p>
+          {endedAtTime && (
+            <p className="text-[10px] text-red-300/60">Ended at {endedAtTime}</p>
+          )}
         </div>
       </div>
     );

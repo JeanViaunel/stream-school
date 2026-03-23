@@ -22,6 +22,7 @@ import type * as crons from "../crons.js";
 import type * as grades from "../grades.js";
 import type * as http from "../http.js";
 import type * as icalExport from "../icalExport.js";
+import type * as inAppNotifications from "../inAppNotifications.js";
 import type * as meetings from "../meetings.js";
 import type * as moderation from "../moderation.js";
 import type * as moderationActions from "../moderationActions.js";
@@ -59,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   grades: typeof grades;
   http: typeof http;
   icalExport: typeof icalExport;
+  inAppNotifications: typeof inAppNotifications;
   meetings: typeof meetings;
   moderation: typeof moderation;
   moderationActions: typeof moderationActions;

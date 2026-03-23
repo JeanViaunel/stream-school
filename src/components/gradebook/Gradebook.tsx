@@ -9,10 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { toast } from "sonner";
-import { Download, Save, Calculator } from "lucide-react";
+import { Download, Save, Calculator, GraduationCap } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface GradebookProps {
   classId: Id<"classes">;
@@ -85,8 +88,31 @@ export function Gradebook({ classId }: GradebookProps) {
   if (!gradebook) {
     return (
       <Card>
-        <CardContent className="p-8 text-center">
-          <p className="text-muted-foreground">Loading gradebook...</p>
+        <CardContent className="p-8">
+          <div className="space-y-4">
+            <div className="h-8 w-48 bg-muted animate-pulse rounded" />
+            <div className="h-[400px] bg-muted animate-pulse rounded" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (gradebook.assignments.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calculator className="w-5 h-5" />
+            Gradebook
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmptyState
+            icon={GraduationCap}
+            title="No assignments yet"
+            description="Create assignments to start tracking grades"
+          />
         </CardContent>
       </Card>
     );
@@ -169,10 +195,27 @@ export function Gradebook({ classId }: GradebookProps) {
                               className="w-full py-2 px-3 rounded hover:bg-muted transition-colors"
                             >
                               {grade ? (
-                                <Badge variant={grade.score / grade.maxScore >= 0.7 ? "default" : 
-                                                grade.score / grade.maxScore >= 0.6 ? "secondary" : "destructive"}>
-                                  {grade.score}/{grade.maxScore}
-                                </Badge>
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <Badge 
+                                      variant={grade.score / grade.maxScore >= 0.9 ? "default" : 
+                                              grade.score / grade.maxScore >= 0.7 ? "secondary" : 
+                                              grade.score / grade.maxScore >= 0.6 ? "outline" : "destructive"}
+                                      className={cn(
+                                        grade.score / grade.maxScore >= 0.9 && "bg-emerald-500 hover:bg-emerald-600",
+                                        grade.score / grade.maxScore >= 0.7 && grade.score / grade.maxScore < 0.9 && "bg-blue-500 hover:bg-blue-600",
+                                        grade.score / grade.maxScore >= 0.6 && grade.score / grade.maxScore < 0.7 && "bg-yellow-500 hover:bg-yellow-600 text-yellow-950",
+                                        grade.score / grade.maxScore < 0.6 && "bg-red-500 hover:bg-red-600"
+                                      )}
+                                    >
+                                      {grade.score}/{grade.maxScore}
+                                    </Badge>
+                                  </div>
+                                  <Progress 
+                                    value={(grade.score / grade.maxScore) * 100} 
+                                    className="h-1.5 w-16 mx-auto"
+                                  />
+                                </div>
                               ) : (
                                 <span className="text-muted-foreground">—</span>
                               )}
@@ -183,9 +226,24 @@ export function Gradebook({ classId }: GradebookProps) {
                     })}
                     <TableCell className="text-center">
                       {overallAvg !== null ? (
-                        <Badge variant={overallAvg >= 70 ? "default" : overallAvg >= 60 ? "secondary" : "destructive"}>
-                          {overallAvg.toFixed(1)}%
-                        </Badge>
+                        <div className="space-y-1">
+                          <Badge 
+                            variant={overallAvg >= 90 ? "default" : overallAvg >= 70 ? "secondary" : overallAvg >= 60 ? "outline" : "destructive"}
+                            className={cn(
+                              "text-sm px-3 py-1",
+                              overallAvg >= 90 && "bg-emerald-500 hover:bg-emerald-600",
+                              overallAvg >= 70 && overallAvg < 90 && "bg-blue-500 hover:bg-blue-600",
+                              overallAvg >= 60 && overallAvg < 70 && "bg-yellow-500 hover:bg-yellow-600 text-yellow-950",
+                              overallAvg < 60 && "bg-red-500 hover:bg-red-600"
+                            )}
+                          >
+                            {overallAvg.toFixed(1)}%
+                          </Badge>
+                          <Progress 
+                            value={overallAvg} 
+                            className="h-2 w-20 mx-auto"
+                          />
+                        </div>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}

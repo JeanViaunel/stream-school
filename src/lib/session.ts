@@ -12,6 +12,7 @@ export interface Session {
   organizationId?: string;
   role?: "student" | "teacher" | "co_teacher" | "parent" | "admin";
   gradeLevel?: number;
+  avatarUrl?: string;
 }
 
 export function getSession(): Session | null {
