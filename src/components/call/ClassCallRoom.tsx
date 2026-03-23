@@ -88,6 +88,24 @@ function ClassCallRoomInner({
 
   // Check if screen sharing is active
   const isScreenSharing = !isScreenShareMuted;
+  const duplicateSessionIds = useMemo(() => {
+    const seenByUserId = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const participant of participants) {
+      const key = participant.userId || participant.sessionId;
+      if (seenByUserId.has(key)) {
+        duplicates.add(participant.sessionId);
+        continue;
+      }
+      seenByUserId.add(key);
+    }
+    return duplicates;
+  }, [participants]);
+  const filterDuplicateParticipants = useCallback(
+    (participant: (typeof participants)[number]) =>
+      !duplicateSessionIds.has(participant.sessionId),
+    [duplicateSessionIds]
+  );
 
   useEffect(() => {
     lastParticipantCountRef.current = participants.length;
@@ -215,14 +233,28 @@ function ClassCallRoomInner({
   const renderLayout = () => {
     switch (currentLayout) {
       case "grid":
-        return <PaginatedGridLayout key="grid-layout" />;
+        return (
+          <PaginatedGridLayout
+            key="grid-layout"
+            filterParticipants={filterDuplicateParticipants}
+          />
+        );
       case "sidebar":
         return (
-          <SpeakerLayout key="sidebar-layout" participantsBarPosition="left" />
+          <SpeakerLayout
+            key="sidebar-layout"
+            filterParticipants={filterDuplicateParticipants}
+            participantsBarPosition="left"
+          />
         );
       case "spotlight":
       default:
-        return <SpeakerLayout key="spotlight-layout" />;
+        return (
+          <SpeakerLayout
+            key="spotlight-layout"
+            filterParticipants={filterDuplicateParticipants}
+          />
+        );
     }
   };
 
@@ -341,6 +373,35 @@ export function ClassCallRoom({
   const studentJoinedAfterAdmitRef = useRef(false);
   const deniedDismissRef = useRef(false);
 
+  const prepareMediaForJoin = useCallback(async (callInstance: Call) => {
+    let cameraEnabled = true;
+    let micEnabled = true;
+    try {
+      const probe = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      probe.getTracks().forEach((track) => track.stop());
+    } catch {
+      try {
+        const camProbe = await navigator.mediaDevices.getUserMedia({ video: true });
+        camProbe.getTracks().forEach((track) => track.stop());
+      } catch {
+        cameraEnabled = false;
+        await callInstance.camera.disable().catch(() => {});
+      }
+
+      try {
+        const micProbe = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micProbe.getTracks().forEach((track) => track.stop());
+      } catch {
+        micEnabled = false;
+        await callInstance.microphone.disable().catch(() => {});
+      }
+    }
+    return { cameraEnabled, micEnabled };
+  }, []);
+
   const pendingUsers: PendingUser[] = useMemo(() => {
     if (!lobbyPending) return [];
     return lobbyPending.map((r) => ({
@@ -353,13 +414,19 @@ export function ClassCallRoom({
 
   useEffect(() => {
     if (!client || activeSession === undefined) return;
+    let mounted = true;
+    let effectCallInstance: Call | null = null;
     if (isTeacher) {
       if (teacherInitRef.current) return;
       teacherInitRef.current = true;
       const run = async () => {
         setIsJoining(true);
         try {
-          const callInstance = client.call("default", callId);
+          const callInstance = client.call("default", callId, {
+            reuseInstance: true
+          });
+          effectCallInstance = callInstance;
+          await prepareMediaForJoin(callInstance);
           await callInstance.join({ create: true });
 
           if (session?.streamUserId) {
@@ -391,18 +458,24 @@ export function ClassCallRoom({
               streamCallId: callId
             });
           }
-          setCall(callInstance);
+          if (mounted) {
+            setCall(callInstance);
+          }
         } catch (err) {
           teacherInitRef.current = false;
           toast.error("Failed to join call");
           console.error(err);
         } finally {
-          setIsJoining(false);
+          if (mounted) {
+            setIsJoining(false);
+          }
         }
       };
       void run();
       return () => {
-        call?.leave().catch(() => {});
+        mounted = false;
+        teacherInitRef.current = false;
+        effectCallInstance?.leave().catch(() => {});
       };
     }
 
@@ -415,30 +488,39 @@ export function ClassCallRoom({
     const runStudent = async () => {
       setIsJoining(true);
       try {
-        const callInstance = client.call("default", callId);
+        const callInstance = client.call("default", callId, {
+          reuseInstance: true
+        });
+        effectCallInstance = callInstance;
         await callInstance.get();
         await requestLobbyAccess({
           sessionId: activeSession._id,
           streamUserId: session.streamUserId,
           displayName: session.displayName ?? "Student"
         });
-        setCall(callInstance);
-        setIsInLobby(true);
+        if (mounted) {
+          setCall(callInstance);
+          setIsInLobby(true);
+        }
       } catch (err) {
         studentLobbyInitRef.current = false;
         toast.error("Could not request to join the classroom");
         console.error(err);
       } finally {
-        setIsJoining(false);
+        if (mounted) {
+          setIsJoining(false);
+        }
       }
     };
     void runStudent();
 
     return () => {
-      call?.leave().catch(() => {});
+      mounted = false;
+      studentLobbyInitRef.current = false;
+      effectCallInstance?.leave().catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, callId, isTeacher, activeSession]);
+  }, [client, callId, isTeacher, activeSession, prepareMediaForJoin]);
 
   /** Join must run from a user gesture (e.g. button); otherwise getUserMedia can fail with "prompting again is not allowed". */
   const handleStudentEnterClassroom = useCallback(async () => {
@@ -448,6 +530,7 @@ export function ClassCallRoom({
     studentJoinedAfterAdmitRef.current = true;
     setIsEnteringClassroom(true);
     try {
+      await prepareMediaForJoin(call);
       await call.join();
       setIsInLobby(false);
     } catch (err) {
@@ -457,7 +540,7 @@ export function ClassCallRoom({
     } finally {
       setIsEnteringClassroom(false);
     }
-  }, [call, isTeacher, myLobbyRequest]);
+  }, [call, isTeacher, myLobbyRequest, prepareMediaForJoin]);
 
   useEffect(() => {
     if (!myLobbyRequest || myLobbyRequest.status !== "denied" || isTeacher)
