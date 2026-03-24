@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { usernameFromIdentity } from "./authHelpers";
@@ -266,5 +266,48 @@ export const deleteNotification = mutation({
 
     await ctx.db.delete(args.notificationId);
     return null;
+  },
+});
+
+// Internal version for use by other Convex functions (no auth check)
+export const createNotificationInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("announcement"),
+      v.literal("grade"),
+      v.literal("session_reminder"),
+      v.literal("mention"),
+      v.literal("assignment")
+    ),
+    title: v.string(),
+    message: v.string(),
+    link: v.optional(v.string()),
+    metadata: v.optional(v.object({
+      classId: v.optional(v.id("classes")),
+      assignmentId: v.optional(v.id("assignments")),
+      sessionId: v.optional(v.id("sessions")),
+    })),
+  },
+  returns: v.id("notifications"),
+  handler: async (ctx, args): Promise<Id<"notifications">> => {
+    // Verify the target user exists
+    const targetUser = await ctx.db.get(args.userId);
+    if (!targetUser) {
+      throw new Error("Target user not found");
+    }
+
+    const notificationId: Id<"notifications"> = await ctx.db.insert("notifications", {
+      userId: args.userId,
+      type: args.type,
+      title: args.title,
+      message: args.message,
+      read: false,
+      link: args.link,
+      metadata: args.metadata,
+      createdAt: Date.now(),
+    });
+
+    return notificationId;
   },
 });

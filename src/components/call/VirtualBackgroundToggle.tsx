@@ -92,18 +92,18 @@ export function VirtualBackgroundToggle() {
           <TooltipTrigger
             render={
               <PopoverTrigger>
-                <button type="button" disabled={!isReady || isLoading} className={triggerClassName}>
-                  {isLoading ? (
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  ) : (
-                    <Camera className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
-                  )}
-                  {state.mode !== "none" && isReady && (
-                    <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-                  )}
-                </button>
+                {isLoading ? (
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                ) : (
+                  <Camera className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+                )}
+                {state.mode !== "none" && isReady && (
+                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                )}
               </PopoverTrigger>
             }
+            disabled={!isReady || isLoading}
+            className={triggerClassName}
           />
           <TooltipContent side="top">
             <p>

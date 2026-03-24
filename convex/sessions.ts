@@ -59,9 +59,18 @@ export const createSession = mutation({
       throw new Error("Only the class teacher can start a session");
     }
 
+    const activeExisting = await ctx.db
+      .query("sessions")
+      .withIndex("by_class_and_started_at", (q) => q.eq("classId", args.classId))
+      .order("desc")
+      .first();
+    if (activeExisting && activeExisting.endedAt === undefined) {
+      return activeExisting._id;
+    }
+
     const sessionId: Id<"sessions"> = await ctx.db.insert("sessions", {
       classId: args.classId,
-      hostId: args.hostId,
+      hostId: user._id,
       streamCallId: args.streamCallId,
       scheduledAt: args.scheduledAt,
       startedAt: Date.now(),
@@ -511,7 +520,11 @@ export const getActiveSessionForClass = query({
 
 export const teacherForceEndSession = action({
   args: { classId: v.id("classes") },
-  returns: v.null(),
+  returns: v.object({
+    sessionEnded: v.boolean(),
+    streamCallEnded: v.boolean(),
+    markerCleared: v.boolean(),
+  }),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
@@ -542,12 +555,45 @@ export const teacherForceEndSession = action({
     if (!active) throw new Error("No active session found for this class");
 
     await ctx.runMutation(internal.sessions.markSessionEnded, { sessionId: active._id });
-    await ctx.runAction(internal.stream.endVideoCall, {
-      callType: "default",
-      callId: active.streamCallId,
-    });
 
-    return null;
+    const classRow: {
+      streamChannelId: string;
+      organizationId: Id<"organizations">;
+      teacherId: Id<"users">;
+      name: string;
+      isArchived: boolean;
+      _id: Id<"classes">;
+    } | null = await ctx.runQuery(internal.classes.getClassByIdInternal, {
+      classId: args.classId,
+    });
+    if (!classRow) throw new Error("Class not found");
+
+    let streamCallEnded = false;
+    try {
+      await ctx.runAction(internal.stream.endVideoCallStrict, {
+        callType: "default",
+        callId: active.streamCallId,
+      });
+      streamCallEnded = true;
+    } catch {
+      streamCallEnded = false;
+    }
+
+    let markerCleared = false;
+    try {
+      await ctx.runAction(internal.stream.clearChannelActiveCallId, {
+        channelId: classRow.streamChannelId,
+      });
+      markerCleared = true;
+    } catch {
+      markerCleared = false;
+    }
+
+    return {
+      sessionEnded: true,
+      streamCallEnded,
+      markerCleared,
+    };
   },
 });
 

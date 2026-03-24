@@ -118,7 +118,13 @@ export default function CallPage({ params }: CallPageProps) {
       if (!leftRef.current && c.state.callingState === CallingState.JOINED) {
         c.leave().catch(() => {});
       }
-      // Clear the active call marker so others can start a new call
+      // Only clear active marker when the call is actually ended by an authorized actor.
+      const canClearMarker = Boolean(
+        c.state.endedAt && (c.isCreatedByMe || session?.role === "admin")
+      );
+      if (!canClearMarker) {
+        return;
+      }
       const channelCid = (c.state.custom as Record<string, unknown>)
         ?.channelCid as string | undefined;
       if (channelCid) {
@@ -130,7 +136,7 @@ export default function CallPage({ params }: CallPageProps) {
           .catch(() => {});
       }
     };
-  }, [videoClient, callId]);
+  }, [videoClient, callId, session?.role]);
 
   const handleLeave = useCallback(() => {
     leftRef.current = true;

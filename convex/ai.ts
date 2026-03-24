@@ -339,7 +339,7 @@ export const getAIUsageStats = action({
     requestsByFeature: v.record(v.string(), v.number()),
     canMakeRequest: v.boolean(),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ totalRequests: number; requestsByFeature: Record<string, number>; canMakeRequest: boolean }> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     

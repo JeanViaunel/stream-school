@@ -211,6 +211,40 @@ export const endVideoCall = internalAction({
   },
 });
 
+export const endVideoCallStrict = internalAction({
+  args: {
+    callType: v.string(),
+    callId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (_ctx, { callType, callId }) => {
+    const serverClient = new StreamClient(
+      process.env.STREAM_API_KEY!,
+      process.env.STREAM_API_SECRET!
+    );
+    await serverClient.video.endCall({ type: callType, id: callId });
+    return null;
+  },
+});
+
+export const clearChannelActiveCallId = internalAction({
+  args: {
+    channelId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (_ctx, { channelId }) => {
+    const chatClient = StreamChat.getInstance(
+      process.env.STREAM_API_KEY!,
+      process.env.STREAM_API_SECRET!
+    );
+    const channel = chatClient.channel("classroom", channelId);
+    await channel.updatePartial({
+      unset: ["active_call_id"],
+    } as Record<string, unknown>);
+    return null;
+  },
+});
+
 export const getSessionChatMessages = internalAction({
   args: {
     channelId: v.string(),

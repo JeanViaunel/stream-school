@@ -219,7 +219,7 @@ function RingingCallPanel({ call }: { call: Call }) {
   const callingState = useCallCallingState();
   const members = useCallMembers();
   const creator = useCallCreatedBy();
-  const { camera, isMute: isCameraMute } = useCameraState();
+  const { isMute: isCameraMute } = useCameraState();
   const [countdown, setCountdown] = useState(30);
   const { settings } = useSettings();
   const stopRingtoneRef = useRef<(() => void) | null>(null);
@@ -232,10 +232,7 @@ function RingingCallPanel({ call }: { call: Call }) {
     await call.leave({ reject: true, reason });
   }, [call, isOutgoing]);
 
-  // Enable camera by default for ring calls
-  useEffect(() => {
-    camera.enable().catch(() => {});
-  }, [camera]);
+  // Keep camera state user-driven; auto-enabling here can trigger blocked permission prompts.
 
   // Start / stop ringtone based on callSounds setting and ringing state
   useEffect(() => {

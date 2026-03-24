@@ -902,7 +902,7 @@ export const bulkImportStudents = action({
     })),
     importLogId: v.optional(v.id("importLogs")),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ imported: number; errors: ImportError[]; importLogId?: Id<"importLogs"> }> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 

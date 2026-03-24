@@ -1,6 +1,6 @@
 "use node";
 
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
@@ -108,7 +108,7 @@ const SEVEN_YEARS_DAYS = 2555; // 7 years in days
 const SEVEN_YEARS_MS = SEVEN_YEARS_DAYS * 24 * 60 * 60 * 1000;
 
 // Data retention cleanup - runs weekly via cron
-export const dataRetentionCleanup = action({
+export const dataRetentionCleanup = internalAction({
   args: {},
   returns: v.object({
     processedOrganizations: v.number(),
@@ -128,7 +128,7 @@ export const dataRetentionCleanup = action({
 
     try {
       // Get all organizations
-      const organizations = await ctx.runQuery(internal.privacy.getAllOrganizations);
+      const organizations = await ctx.runAction(internal.privacy.getAllOrganizations, {});
 
       for (const org of organizations) {
         try {
@@ -140,39 +140,39 @@ export const dataRetentionCleanup = action({
 
           // Clean up old audit logs (keep for 2 years)
           const auditLogCutoff = Date.now() - (2 * 365 * 24 * 60 * 60 * 1000);
-          const oldAuditLogs = await ctx.runQuery(internal.privacy.getOldAuditLogs, {
+          const oldAuditLogs = await ctx.runAction(internal.privacy.getOldAuditLogs, {
             organizationId: org._id,
             cutoffDate: auditLogCutoff,
           });
 
           for (const log of oldAuditLogs) {
             // Archive to cold storage if needed, then delete
-            await ctx.runMutation(internal.privacy.deleteAuditLog, {
+            await ctx.runAction(internal.privacy.deleteAuditLog, {
               logId: log._id,
             });
             results.deletedRecords++;
           }
 
           // Clean up old sessions and session logs
-          const oldSessions = await ctx.runQuery(internal.privacy.getOldSessions, {
+          const oldSessions = await ctx.runAction(internal.privacy.getOldSessions, {
             cutoffDate: orgCutoffDate,
           });
 
           for (const session of oldSessions) {
             // Archive session data before deletion
-            await ctx.runMutation(internal.privacy.archiveAndDeleteSession, {
+            await ctx.runAction(internal.privacy.archiveAndDeleteSession, {
               sessionId: session._id,
             });
             results.archivedRecords++;
           }
 
           // Clean up old submissions for deleted/archived classes
-          const oldSubmissions = await ctx.runQuery(internal.privacy.getOldSubmissions, {
+          const oldSubmissions = await ctx.runAction(internal.privacy.getOldSubmissions, {
             cutoffDate: orgCutoffDate,
           });
 
           for (const submission of oldSubmissions) {
-            await ctx.runMutation(internal.privacy.deleteSubmission, {
+            await ctx.runAction(internal.privacy.deleteSubmission, {
               submissionId: submission._id,
             });
             results.deletedRecords++;
@@ -181,7 +181,7 @@ export const dataRetentionCleanup = action({
           // Log cleanup completion for this org
           await ctx.runMutation(internal.auditLog.createAuditLog, {
             organizationId: org._id,
-            actorId: org._id, // System actor
+            actorId: org._id as unknown as Id<"users">, // System actor (organization acting as system)
             action: "data_retention_cleanup",
             targetId: org._id,
             targetType: "organization",
@@ -207,7 +207,7 @@ export const dataRetentionCleanup = action({
 });
 
 // Log data access for FERPA compliance
-export const logDataAccess = action({
+export const logDataAccess = internalAction({
   args: {
     organizationId: v.id("organizations"),
     actorId: v.id("users"),
@@ -220,7 +220,7 @@ export const logDataAccess = action({
   },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    await ctx.runMutation(internal.privacy.createDataAccessLog, {
+    await ctx.runAction(internal.privacy.createDataAccessLog, {
       organizationId: args.organizationId,
       actorId: args.actorId,
       targetId: args.targetId,
@@ -235,7 +235,7 @@ export const logDataAccess = action({
 });
 
 // Internal queries for cleanup
-export const getAllOrganizations = action({
+export const getAllOrganizations = internalAction({
   args: {},
   returns: v.array(
     v.object({
@@ -247,7 +247,7 @@ export const getAllOrganizations = action({
   ),
   handler: async (ctx): Promise<Array<{ _id: Id<"organizations">; settings: { dataRetentionDays: number } }>> => {
     const orgs = await ctx.runQuery(internal.organizations.getAllOrganizations);
-    return orgs.map((org) => ({
+    return orgs.map((org: { _id: Id<"organizations">; settings: { dataRetentionDays: number } }) => ({
       _id: org._id,
       settings: {
         dataRetentionDays: org.settings.dataRetentionDays,
@@ -256,7 +256,7 @@ export const getAllOrganizations = action({
   },
 });
 
-export const getOldAuditLogs = action({
+export const getOldAuditLogs = internalAction({
   args: {
     organizationId: v.id("organizations"),
     cutoffDate: v.number(),
@@ -274,7 +274,7 @@ export const getOldAuditLogs = action({
   },
 });
 
-export const getOldSessions = action({
+export const getOldSessions = internalAction({
   args: {
     cutoffDate: v.number(),
   },
@@ -290,7 +290,7 @@ export const getOldSessions = action({
   },
 });
 
-export const getOldSubmissions = action({
+export const getOldSubmissions = internalAction({
   args: {
     cutoffDate: v.number(),
   },
@@ -307,7 +307,7 @@ export const getOldSubmissions = action({
 });
 
 // Internal mutations for cleanup
-export const deleteAuditLog = action({
+export const deleteAuditLog = internalAction({
   args: {
     logId: v.id("auditLogs"),
   },
@@ -320,7 +320,7 @@ export const deleteAuditLog = action({
   },
 });
 
-export const archiveAndDeleteSession = action({
+export const archiveAndDeleteSession = internalAction({
   args: {
     sessionId: v.id("sessions"),
   },
@@ -333,7 +333,7 @@ export const archiveAndDeleteSession = action({
   },
 });
 
-export const deleteSubmission = action({
+export const deleteSubmission = internalAction({
   args: {
     submissionId: v.id("submissions"),
   },
@@ -346,7 +346,7 @@ export const deleteSubmission = action({
   },
 });
 
-export const createDataAccessLog = action({
+export const createDataAccessLog = internalAction({
   args: {
     organizationId: v.id("organizations"),
     actorId: v.id("users"),

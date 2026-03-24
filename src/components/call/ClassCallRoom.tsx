@@ -13,11 +13,12 @@ import {
   CallingState,
   BackgroundFiltersProvider
 } from "@stream-io/video-react-sdk";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Lobby } from "./Lobby";
+import { PreJoinScreen, type PreJoinPrefs } from "./PreJoinScreen";
 import { LobbyAdmitter } from "./LobbyAdmitter";
 import { CallEnded } from "./CallEnded";
 import { FloatingControls, CallLayout } from "./FloatingControls";
@@ -349,7 +350,7 @@ export function ClassCallRoom({
   const isTeacher = session?.userId === teacherId;
   const client = useStreamVideoClient();
   const createSession = useMutation(api.sessions.createSession);
-  const endSessionMutation = useMutation(api.sessions.endSession);
+  const teacherForceEndSession = useAction(api.sessions.teacherForceEndSession);
   const requestLobbyAccess = useMutation(api.sessions.requestLobbyAccess);
   const admitLobbyRequest = useMutation(api.sessions.admitLobbyRequest);
   const denyLobbyRequest = useMutation(api.sessions.denyLobbyRequest);
@@ -364,6 +365,11 @@ export function ClassCallRoom({
     api.sessions.getMyLobbyRequestForSession,
     !isTeacher && activeSession?._id ? { sessionId: activeSession._id } : "skip"
   );
+  const [preJoinDone, setPreJoinDone] = useState(false);
+  const [preJoinPrefs, setPreJoinPrefs] = useState<PreJoinPrefs>({
+    cameraEnabled: true,
+    micEnabled: true
+  });
   const [call, setCall] = useState<Call | null>(null);
   const [isJoining, setIsJoining] = useState(false);
   const [isEnteringClassroom, setIsEnteringClassroom] = useState(false);
@@ -373,33 +379,77 @@ export function ClassCallRoom({
   const studentJoinedAfterAdmitRef = useRef(false);
   const deniedDismissRef = useRef(false);
 
-  const prepareMediaForJoin = useCallback(async (callInstance: Call) => {
+  const prepareMediaForJoin = useCallback(async (
+    callInstance: Call,
+    prefs?: PreJoinPrefs
+  ) => {
     let cameraEnabled = true;
     let micEnabled = true;
+
+    const resolvePermissionState = async (
+      name: "camera" | "microphone"
+    ): Promise<PermissionState | null> => {
+      if (!navigator.permissions?.query) return null;
+      try {
+        const status = await navigator.permissions.query({
+          // Browser PermissionName typings are not consistent across versions.
+          name: name as PermissionName
+        });
+        return status.state;
+      } catch {
+        return null;
+      }
+    };
+
+    const cameraPermission = await resolvePermissionState("camera");
+    const micPermission = await resolvePermissionState("microphone");
+
+    // Avoid retrying blocked permissions that the browser won't prompt for again.
+    const shouldRequestVideo = cameraPermission !== "denied";
+    const shouldRequestAudio = micPermission !== "denied";
+
+    if (!shouldRequestVideo) {
+      cameraEnabled = false;
+      await callInstance.camera.disable().catch(() => {});
+    }
+    if (!shouldRequestAudio) {
+      micEnabled = false;
+      await callInstance.microphone.disable().catch(() => {});
+    }
+
+    if (!shouldRequestVideo && !shouldRequestAudio) {
+      return { cameraEnabled, micEnabled };
+    }
+
     try {
       const probe = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
+        video: shouldRequestVideo,
+        audio: shouldRequestAudio
       });
       probe.getTracks().forEach((track) => track.stop());
     } catch {
-      try {
-        const camProbe = await navigator.mediaDevices.getUserMedia({ video: true });
-        camProbe.getTracks().forEach((track) => track.stop());
-      } catch {
+      // If getUserMedia still fails, disable only the tracks we attempted.
+      if (shouldRequestVideo) {
         cameraEnabled = false;
         await callInstance.camera.disable().catch(() => {});
       }
-
-      try {
-        const micProbe = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micProbe.getTracks().forEach((track) => track.stop());
-      } catch {
+      if (shouldRequestAudio) {
         micEnabled = false;
         await callInstance.microphone.disable().catch(() => {});
       }
     }
-    return { cameraEnabled, micEnabled };
+
+    // Apply the user's pre-join preferences on top of the permission state
+    if (prefs) {
+      if (!prefs.cameraEnabled && cameraEnabled) {
+        await callInstance.camera.disable().catch(() => {});
+      }
+      if (!prefs.micEnabled && micEnabled) {
+        await callInstance.microphone.disable().catch(() => {});
+      }
+    }
+
+    return { cameraEnabled: prefs?.cameraEnabled ?? cameraEnabled, micEnabled: prefs?.micEnabled ?? micEnabled };
   }, []);
 
   const pendingUsers: PendingUser[] = useMemo(() => {
@@ -414,6 +464,7 @@ export function ClassCallRoom({
 
   useEffect(() => {
     if (!client || activeSession === undefined) return;
+    if (!preJoinDone) return;
     let mounted = true;
     let effectCallInstance: Call | null = null;
     if (isTeacher) {
@@ -426,8 +477,17 @@ export function ClassCallRoom({
             reuseInstance: true
           });
           effectCallInstance = callInstance;
-          await prepareMediaForJoin(callInstance);
-          await callInstance.join({ create: true });
+          const currentState = callInstance.state.callingState;
+          const alreadyJoiningOrJoined =
+            currentState === CallingState.JOINING ||
+            currentState === CallingState.JOINED;
+
+          await prepareMediaForJoin(callInstance, preJoinPrefs);
+          if (!mounted) return;
+          if (!alreadyJoiningOrJoined) {
+            await callInstance.join({ create: true });
+          }
+          if (!mounted) return;
 
           if (session?.streamUserId) {
             try {
@@ -458,9 +518,8 @@ export function ClassCallRoom({
               streamCallId: callId
             });
           }
-          if (mounted) {
-            setCall(callInstance);
-          }
+          if (!mounted) return;
+          setCall(callInstance);
         } catch (err) {
           teacherInitRef.current = false;
           toast.error("Failed to join call");
@@ -493,15 +552,15 @@ export function ClassCallRoom({
         });
         effectCallInstance = callInstance;
         await callInstance.get();
+        if (!mounted) return;
         await requestLobbyAccess({
           sessionId: activeSession._id,
           streamUserId: session.streamUserId,
           displayName: session.displayName ?? "Student"
         });
-        if (mounted) {
-          setCall(callInstance);
-          setIsInLobby(true);
-        }
+        if (!mounted) return;
+        setCall(callInstance);
+        setIsInLobby(true);
       } catch (err) {
         studentLobbyInitRef.current = false;
         toast.error("Could not request to join the classroom");
@@ -520,7 +579,7 @@ export function ClassCallRoom({
       effectCallInstance?.leave().catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, callId, isTeacher, activeSession, prepareMediaForJoin]);
+  }, [client, callId, isTeacher, activeSession, prepareMediaForJoin, preJoinDone, preJoinPrefs]);
 
   /** Join must run from a user gesture (e.g. button); otherwise getUserMedia can fail with "prompting again is not allowed". */
   const handleStudentEnterClassroom = useCallback(async () => {
@@ -530,7 +589,7 @@ export function ClassCallRoom({
     studentJoinedAfterAdmitRef.current = true;
     setIsEnteringClassroom(true);
     try {
-      await prepareMediaForJoin(call);
+      await prepareMediaForJoin(call, preJoinPrefs);
       await call.join();
       setIsInLobby(false);
     } catch (err) {
@@ -540,7 +599,7 @@ export function ClassCallRoom({
     } finally {
       setIsEnteringClassroom(false);
     }
-  }, [call, isTeacher, myLobbyRequest, prepareMediaForJoin]);
+  }, [call, isTeacher, myLobbyRequest, prepareMediaForJoin, preJoinPrefs]);
 
   useEffect(() => {
     if (!myLobbyRequest || myLobbyRequest.status !== "denied" || isTeacher)
@@ -550,37 +609,6 @@ export function ClassCallRoom({
     toast.error("The teacher did not admit you to this session");
     onLeave();
   }, [myLobbyRequest, isTeacher, onLeave]);
-
-  // Student: auto-join when admitted
-  useEffect(() => {
-    if (
-      !call ||
-      isTeacher ||
-      !myLobbyRequest ||
-      myLobbyRequest.status !== "admitted" ||
-      !isInLobby
-    )
-      return;
-    if (studentJoinedAfterAdmitRef.current) return;
-
-    const autoJoin = async () => {
-      studentJoinedAfterAdmitRef.current = true;
-      setIsEnteringClassroom(true);
-      try {
-        await prepareMediaForJoin(call);
-        await call.join();
-        setIsInLobby(false);
-      } catch (err) {
-        studentJoinedAfterAdmitRef.current = false;
-        toast.error("Failed to enter the classroom");
-        console.error(err);
-      } finally {
-        setIsEnteringClassroom(false);
-      }
-    };
-
-    void autoJoin();
-  }, [call, isTeacher, myLobbyRequest, isInLobby, prepareMediaForJoin]);
 
   // Student: listen for admission signal from the teacher
   useEffect(() => {
@@ -670,13 +698,17 @@ export function ClassCallRoom({
   };
 
   const handleEndForAll = async () => {
-    if (activeSession) {
-      await endSessionMutation({ sessionId: activeSession._id }).catch(
-        () => {}
-      );
+    if (!isTeacher) return;
+    try {
+      const result = await teacherForceEndSession({ classId });
+      if (!result.streamCallEnded) {
+        toast.error("Session marked ended, but Stream call shutdown failed");
+        return;
+      }
+      onLeave();
+    } catch {
+      toast.error("Failed to end session for everyone");
     }
-    await call?.endCall().catch(() => {});
-    onLeave();
   };
 
   const handleMuteAll = async () => {
@@ -688,6 +720,19 @@ export function ClassCallRoom({
       toast.error("Failed to mute all");
     }
   };
+
+  if (!preJoinDone) {
+    return (
+      <PreJoinScreen
+        roomName={className}
+        isTeacher={isTeacher}
+        onContinue={(prefs) => {
+          setPreJoinPrefs(prefs);
+          setPreJoinDone(true);
+        }}
+      />
+    );
+  }
 
   if (activeSession === undefined) {
     return (

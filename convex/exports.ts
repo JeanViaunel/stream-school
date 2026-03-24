@@ -79,6 +79,17 @@ export const requestDataExport = action({
   },
 });
 
+// Export record type for return annotation
+interface ExportStatus {
+  _id: Id<"dataExports">;
+  status: "pending" | "processing" | "completed" | "failed";
+  downloadUrl?: string;
+  expiresAt?: number;
+  errorMessage?: string;
+  requestedAt: number;
+  completedAt?: number;
+}
+
 // Get export status
 export const getExportStatus = action({
   args: {
@@ -101,7 +112,7 @@ export const getExportStatus = action({
     }),
     v.null()
   ),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<ExportStatus | null> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       return null;
@@ -115,7 +126,7 @@ export const getExportStatus = action({
       return null;
     }
 
-    const exportRecord = await ctx.runQuery(internal.exports.getExportRecord, {
+    const exportRecord: { _id: Id<"dataExports">; userId: Id<"users">; status: "pending" | "processing" | "completed" | "failed"; downloadUrl?: string; expiresAt?: number; errorMessage?: string; requestedAt: number; completedAt?: number } | null = await ctx.runQuery(internal.exports.getExportRecord, {
       exportId: args.exportId,
     });
     

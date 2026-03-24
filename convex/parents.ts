@@ -1,11 +1,11 @@
-import { mutation, query, internalQuery } from "./_generated/server";
+import { mutation, query, internalQuery, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { usernameFromIdentity } from "./authHelpers";
 
 // Helper function to verify parent role and get user
-async function getParentUser(ctx: any) {
+async function getParentUser(ctx: QueryCtx) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) {
     throw new Error("Not authenticated");
@@ -29,7 +29,7 @@ async function getParentUser(ctx: any) {
 
 // Helper function to verify parent-student link with consent
 async function verifyParentLink(
-  ctx: any, 
+  ctx: QueryCtx, 
   parentId: Id<"users">, 
   studentId: Id<"users">
 ): Promise<boolean> {
@@ -315,7 +315,7 @@ export const linkStudentToParent = mutation({
 
     // Send notification to student
     try {
-      await ctx.runMutation(internal.inAppNotifications.createNotification, {
+      await ctx.runMutation(internal.inAppNotifications.createNotificationInternal, {
         userId: student._id,
         type: "announcement",
         title: "Parent Link Request",
@@ -378,7 +378,7 @@ export const unlinkStudentFromParent = mutation({
     // Notify the other party
     const notifyUserId = isParent ? link.studentId : link.parentId;
     try {
-      await ctx.runMutation(internal.inAppNotifications.createNotification, {
+      await ctx.runMutation(internal.inAppNotifications.createNotificationInternal, {
         userId: notifyUserId,
         type: "announcement",
         title: "Parent Link Removed",
@@ -432,7 +432,7 @@ export const giveConsent = mutation({
 
     // Notify parent
     try {
-      await ctx.runMutation(internal.inAppNotifications.createNotification, {
+      await ctx.runMutation(internal.inAppNotifications.createNotificationInternal, {
         userId: link.parentId,
         type: "announcement",
         title: "Link Approved",

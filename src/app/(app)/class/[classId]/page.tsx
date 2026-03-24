@@ -76,6 +76,10 @@ export default function ClassPage() {
   }, [classData, client, setActiveChannel]);
 
   const handleStartSession = () => {
+    if (activeSession) {
+      router.push(`/class/${classId}/session/${activeSession.streamCallId}`);
+      return;
+    }
     const sessionId = `session_${Date.now()}`;
     router.push(`/class/${classId}/session/${sessionId}`);
   };
@@ -88,7 +92,13 @@ export default function ClassPage() {
   const handleEndSession = async () => {
     if (!confirm("End the active session for everyone?")) return;
     try {
-      await teacherForceEndSession({ classId: classId as Id<"classes"> });
+      const result = await teacherForceEndSession({
+        classId: classId as Id<"classes">
+      });
+      if (!result.streamCallEnded) {
+        toast.error("Session marked ended, but Stream call shutdown failed");
+        return;
+      }
       toast.success("Session ended");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to end session");

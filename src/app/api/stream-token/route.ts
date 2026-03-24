@@ -28,12 +28,11 @@ function verifyStreamJwt(
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const streamUserId = searchParams.get("userId");
   const currentToken = searchParams.get("currentToken");
 
-  if (!streamUserId || !currentToken) {
+  if (!currentToken) {
     return NextResponse.json(
-      { error: "userId and currentToken required" },
+      { error: "currentToken required" },
       { status: 400 }
     );
   }
@@ -47,12 +46,14 @@ export async function GET(request: NextRequest) {
   }
 
   const claims = verifyStreamJwt(currentToken, apiSecret);
-  if (!claims || claims.user_id !== streamUserId) {
+  if (!claims || !claims.user_id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const token = await convex.action(api.auth.refreshToken, { streamUserId });
+    const token = await convex.action(api.auth.refreshToken, {
+      streamUserId: claims.user_id
+    });
     return NextResponse.json({ token });
   } catch {
     return NextResponse.json(

@@ -9,6 +9,7 @@ import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { type Id } from "./_generated/dataModel";
 import bcrypt from "bcryptjs";
+import { usernameFromIdentity } from "./authHelpers";
 
 const userRoleReturn = v.union(
   v.literal("student"),
@@ -202,6 +203,28 @@ export const refreshToken = action({
       userId: args.streamUserId
     });
     return token;
+  }
+});
+
+export const refreshMyToken = action({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx: ActionCtx): Promise<string> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.runQuery(internal.users.getUserByUsername, {
+      username: usernameFromIdentity(identity)
+    });
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    return await ctx.runAction(internal.stream.generateToken, {
+      userId: user.streamUserId
+    });
   }
 });
 

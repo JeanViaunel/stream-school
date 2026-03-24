@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { StreamVideoClient, StreamVideo, StreamTheme } from "@stream-io/video-react-sdk";
 import { useCreateChatClient, Chat } from "stream-chat-react";
+import { useAction } from "convex/react";
+import { api } from "@/../convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Session } from "@/lib/session";
 
@@ -16,16 +18,13 @@ interface ConnectedProvidersProps {
 function ConnectedProviders({ session, children }: ConnectedProvidersProps) {
   const [videoClient, setVideoClient] = useState<StreamVideoClient | undefined>();
   const latestToken = useRef(session.token);
+  const refreshMyToken = useAction(api.auth.refreshMyToken);
 
   const tokenProvider = useCallback(async () => {
-    const res = await fetch(
-      `/api/stream-token?userId=${encodeURIComponent(session.streamUserId)}&currentToken=${encodeURIComponent(latestToken.current)}`
-    );
-    if (!res.ok) throw new Error("Failed to refresh token");
-    const data = (await res.json()) as { token: string };
-    latestToken.current = data.token;
-    return data.token;
-  }, [session.streamUserId]);
+    const token = await refreshMyToken({});
+    latestToken.current = token;
+    return token;
+  }, [refreshMyToken]);
 
   const chatClient = useCreateChatClient({
     apiKey: API_KEY,
